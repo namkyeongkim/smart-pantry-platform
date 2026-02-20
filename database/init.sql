@@ -1,4 +1,5 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 -- Database Initialization for Pantry App PoC
 
 -- 1. Create Tables
@@ -33,6 +34,7 @@ VALUES
     (1, 'Tomato', 3, 'whole'),
     (1, 'Salsa', 1, 'jar');
 =======
+=======
 -- Database Initialization for Pantry App PoC
 
 -- 1. Create Tables
@@ -66,4 +68,6 @@ VALUES
     (1, 'Black Beans', 2, 'cans'),
     (1, 'Tomato', 3, 'whole'),
     (1, 'Salsa', 1, 'jar');
+<<<<<<< Updated upstream
+=======
 >>>>>>> Stashed changes

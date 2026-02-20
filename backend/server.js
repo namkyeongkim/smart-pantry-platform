@@ -1,4 +1,5 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 const express = require('express');
 const axios = require('axios');
 const { Pool } = require('pg');
@@ -152,6 +153,7 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 =======
+=======
 const express = require('express');
 const axios = require('axios');
 const { Pool } = require('pg');
@@ -304,4 +306,6 @@ app.post('/api/recommend', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
+<<<<<<< Updated upstream
+=======
 >>>>>>> Stashed changes
