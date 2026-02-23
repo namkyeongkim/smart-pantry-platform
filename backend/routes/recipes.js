@@ -112,7 +112,7 @@ router.post('/search', authenticateToken, async (req, res) => {
 });
 
 // Search recipes based on keyword/mood (Integrated from friend's backend)
-router.post('/search-mood', authenticateToken, async (req, res) => {
+router.post('/search-mood', async (req, res) => {
     const { mood, servings } = req.body;
     const query = mood || "dinner";
 
@@ -204,6 +204,24 @@ router.post('/cook', authenticateToken, async (req, res) => {
         console.error('Cook recipe error:', err.message);
         res.status(500).json({ error: 'Failed to cook recipe' });
     }
+});
+
+// Fetch full recipe details from Spoonacular API by recipe ID
+router.get('/details/:id', async (req, res) => {
+  const recipeId = req.params.id;
+
+  try {
+    const response = await fetch(
+      `https://api.spoonacular.com/recipes/${recipeId}/information?apiKey=${process.env.SPOONACULAR_API_KEY}`
+    );
+
+    const data = await response.json();
+    res.json(data);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch recipe details' });
+  }
 });
 
 module.exports = router;
