@@ -35,21 +35,21 @@ const AppNavigator = ({ token, user, onLogout }) => {
 
         {/* Navigation Buttons */}
         <View style={styles.navButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.navButton}
             onPress={() => navigation.navigate('Pantry')}
           >
             <Text style={styles.navButtonText}>🗄️ Pantry</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.navButton}
             onPress={() => navigation.navigate('RecipeSearch')}
           >
             <Text style={styles.navButtonText}>🔍 Recipes</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.navButton, styles.profileButton]}
             onPress={() => navigation.navigate('Profile', { user })}
           >
@@ -73,17 +73,16 @@ const AppNavigator = ({ token, user, onLogout }) => {
           },
         }}
       >
-        <Stack.Screen 
-          name="Home" 
+        <Stack.Screen
+          name="Home"
           component={HomeScreen}
           options={({ navigation }) => ({
             header: () => <HomeHeader navigation={navigation} />
           })}
         />
-        
-        <Stack.Screen 
-          name="Profile" 
-          component={ProfileScreen}
+
+        <Stack.Screen
+          name="Profile"
           options={({ navigation }) => ({
             title: 'Diet Profile',
             headerStyle: {
@@ -98,45 +97,47 @@ const AppNavigator = ({ token, user, onLogout }) => {
               </TouchableOpacity>
             ),
           })}
-        />
+        >
+          {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
+        </Stack.Screen>
 
-        <Stack.Screen 
-          name="Favorites" 
+        <Stack.Screen
+          name="Favorites"
           component={FavoritesScreen}
-          options={{ 
+          options={{
             title: 'My Favorites',
             headerStyle: {
               backgroundColor: '#5a7559',
             },
           }}
         />
-        
-        <Stack.Screen 
-          name="Pantry" 
+
+        <Stack.Screen
+          name="Pantry"
           component={PantryScreen}
           options={{ title: `${user?.username || 'My'} Pantry` }}
         />
-        
-        <Stack.Screen 
-          name="AddItem" 
+
+        <Stack.Screen
+          name="AddItem"
           component={AddItemScreen}
           options={{ title: 'Add Ingredient' }}
         />
-        
-        <Stack.Screen 
-          name="RecipeSearch" 
+
+        <Stack.Screen
+          name="RecipeSearch"
           component={RecipeSearchScreen}
           options={{ title: 'Find Recipes' }}
         />
-        
-        <Stack.Screen 
-          name="RecipeResults" 
+
+        <Stack.Screen
+          name="RecipeResults"
           component={RecipeResultsScreen}
           options={{ title: 'Recipe Results' }}
         />
-        
-        <Stack.Screen 
-          name="CookRecipe" 
+
+        <Stack.Screen
+          name="CookRecipe"
           component={CookRecipeScreen}
           options={{ title: 'Cook Recipe' }}
         />

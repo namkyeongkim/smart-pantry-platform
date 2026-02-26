@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,38 @@ import {
   StyleSheet,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { cookRecipe } from '../services/api';
+import { cookRecipe, getRecipeDetail } from '../services/api';
 
 const CookRecipeScreen = ({ route, navigation }) => {
-  const { recipe } = route.params;
+  const { recipe: passedRecipe } = route.params;
+  const [recipe, setRecipe] = useState(passedRecipe);
   const [cooking, setCooking] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const hasAllIngredients = recipe.hasAllIngredients ?? false;
+
+  // Fetch full recipe details if instructions are missing (e.g. coming from search)
+  useEffect(() => {
+    const needsDetail =
+      !recipe.analyzedInstructions && !recipe.instructions;
+
+    if (needsDetail) {
+      const fetchDetail = async () => {
+        setLoadingDetail(true);
+        try {
+          const full = await getRecipeDetail(recipe.id || recipe.recipe_id);
+          // Merge full detail with existing data (keep hasAllIngredients etc.)
+          setRecipe(prev => ({ ...prev, ...full }));
+        } catch (err) {
+          console.error('Failed to load recipe detail:', err);
+        } finally {
+          setLoadingDetail(false);
+        }
+      };
+      fetchDetail();
+    }
+  }, []);
 
   const handleCookRecipe = async () => {
     Alert.alert(
@@ -68,104 +93,109 @@ const CookRecipeScreen = ({ route, navigation }) => {
 
         {/* Ingredients You Have */}
         {Array.isArray(recipe.availableIngredients) &&
-        recipe.availableIngredients.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🟢 Ingredients You Have:</Text>
-            
-        {recipe.availableIngredients.map((ing, index) => {
-          const name =
-            typeof ing === 'string'
-              ? ing
-              : ing?.original || ing?.name;
+          recipe.availableIngredients.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🟢 Ingredients You Have:</Text>
 
-          return (
-            <View key={index} style={styles.ingredientItem}>
-              <Text style={styles.ingredientText}>• {name}</Text>
-            </View>
-          );
-        })}
-          </View>
-        )}
-
-        {Array.isArray(recipe.missingIngredients) &&
-        recipe.missingIngredients.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⚠️ Missing Ingredients:</Text>
-            <View style={styles.warningBox}>
-              {recipe.missingIngredients.map((ing, index) => {
+              {recipe.availableIngredients.map((ing, index) => {
                 const name =
                   typeof ing === 'string'
                     ? ing
-                    : ing?.name || ing?.original || 'Unknown ingredient';
+                    : ing?.original || ing?.name;
 
                 return (
-                  <Text key={index} style={styles.missingText}>
-                    • {name}
-                  </Text>
+                  <View key={index} style={styles.ingredientItem}>
+                    <Text style={styles.ingredientText}>• {name}</Text>
+                  </View>
                 );
               })}
-              <Text style={styles.warningNote}>
-                You need these ingredients before cooking.
-              </Text>
             </View>
-          </View>
-        )}  
+          )}
 
-      {/* Instructions - show ONLY if all ingredients available */}
+        {Array.isArray(recipe.missingIngredients) &&
+          recipe.missingIngredients.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>⚠️ Missing Ingredients:</Text>
+              <View style={styles.warningBox}>
+                {recipe.missingIngredients.map((ing, index) => {
+                  const name =
+                    typeof ing === 'string'
+                      ? ing
+                      : ing?.name || ing?.original || 'Unknown ingredient';
 
-      {hasAllIngredients && (
-      <>
-        <View
-          style={{
-            backgroundColor: '#d4edda',
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 15,
-          }}
-        >
-          <Text style={{ color: '#155724', fontWeight: '600' }}>
-            ✅ You have all required ingredients!
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Cooking Steps:</Text>
-
-          {recipe.analyzedInstructions &&
-          recipe.analyzedInstructions.length > 0 ? (
-            recipe.analyzedInstructions[0].steps.map((step, index) => (
-              <View key={index} style={styles.stepCard}>
-                <Text style={styles.stepLabel}>
-                  STEP {index + 1}
-                </Text>
-                <Text style={styles.stepDescription}>
-                  {step.step}
+                  return (
+                    <Text key={index} style={styles.missingText}>
+                      • {name}
+                    </Text>
+                  );
+                })}
+                <Text style={styles.warningNote}>
+                  You need these ingredients before cooking.
                 </Text>
               </View>
-            ))
-          ) : recipe.instructions ? (
-            recipe.instructions
-              .replace(/<[^>]+>/g, '')
-              .split('. ')
-              .filter(Boolean)
-              .map((sentence, index) => (
-                <View key={index} style={styles.stepCard}>
-                  <Text style={styles.stepLabel}>
-                    STEP {index + 1}
-                  </Text>
-                  <Text style={styles.stepDescription}>
-                    {sentence.trim()}.
-                  </Text>
-                </View>
-              ))
-          ) : (
-            <Text>No instructions available.</Text>
+            </View>
           )}
-        </View>
-      </>
-    )}
 
-        
+        {/* Instructions - show ONLY if all ingredients available */}
+
+        {hasAllIngredients && (
+          <>
+            <View
+              style={{
+                backgroundColor: '#d4edda',
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 15,
+              }}
+            >
+              <Text style={{ color: '#155724', fontWeight: '600' }}>
+                ✅ You have all required ingredients!
+              </Text>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>📝 Cooking Steps:</Text>
+
+              {loadingDetail ? (
+                <View style={{ alignItems: 'center', padding: 20 }}>
+                  <ActivityIndicator size="large" color="#27ae60" />
+                  <Text style={{ marginTop: 10, color: '#666' }}>Loading instructions...</Text>
+                </View>
+              ) : recipe.analyzedInstructions &&
+                recipe.analyzedInstructions.length > 0 ? (
+                recipe.analyzedInstructions[0].steps.map((step, index) => (
+                  <View key={index} style={styles.stepCard}>
+                    <Text style={styles.stepLabel}>
+                      STEP {index + 1}
+                    </Text>
+                    <Text style={styles.stepDescription}>
+                      {step.step}
+                    </Text>
+                  </View>
+                ))
+              ) : recipe.instructions ? (
+                recipe.instructions
+                  .replace(/<[^>]+>/g, '')
+                  .split('. ')
+                  .filter(Boolean)
+                  .map((sentence, index) => (
+                    <View key={index} style={styles.stepCard}>
+                      <Text style={styles.stepLabel}>
+                        STEP {index + 1}
+                      </Text>
+                      <Text style={styles.stepDescription}>
+                        {sentence.trim()}.
+                      </Text>
+                    </View>
+                  ))
+              ) : (
+                <Text>No instructions available.</Text>
+              )}
+            </View>
+          </>
+        )}
+
+
 
         <View style={styles.warningSection}>
           <Text style={styles.warningTitle}>⚠️ Important:</Text>

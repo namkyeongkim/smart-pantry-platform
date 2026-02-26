@@ -24,7 +24,7 @@ const FLAG_MAP = {
   seafoodAllergy: 'Seafood-Allergy',
 };
 
-const ProfileScreen = ({ navigation, route }) => {
+const ProfileScreen = ({ navigation, route, onLogout }) => {
   const { user } = route.params;
 
   const [preferences, setPreferences] = useState({
@@ -58,37 +58,37 @@ const ProfileScreen = ({ navigation, route }) => {
     loadPreferences();
   }, []);
 
-useLayoutEffect(() => {
-  navigation.setOptions({
-    headerRight: () => (
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Favorites')}
-        style={{
-          marginRight: 16,
-          flexDirection: 'row',
-          alignItems: 'center'
-        }}
-      >
-        <Ionicons
-          name="heart"
-          size={20}        
-          color="red"
-          style={{ marginTop: 1 }}  
-        />
-        <Text
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Favorites')}
           style={{
-            marginLeft: 6,
-            color: 'white',
-            fontWeight: '600',
-            fontSize: 17
+            marginRight: 16,
+            flexDirection: 'row',
+            alignItems: 'center'
           }}
         >
-          Favorites
-        </Text>
-      </TouchableOpacity>
-    ),
-  });
-}, [navigation]);
+          <Ionicons
+            name="heart"
+            size={20}
+            color="red"
+            style={{ marginTop: 1 }}
+          />
+          <Text
+            style={{
+              marginLeft: 6,
+              color: 'white',
+              fontWeight: '600',
+              fontSize: 17
+            }}
+          >
+            Favorites
+          </Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const togglePreference = useCallback(async (key) => {
     if (saving) return;
@@ -125,10 +125,6 @@ useLayoutEffect(() => {
           style: 'destructive',
           onPress: () => {
             onLogout();
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Home' }],
-            });
           }
         }
       ]

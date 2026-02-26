@@ -141,6 +141,96 @@ router.post('/search', authenticateToken, async (req, res) => {
 });
 
 /* =====================================================
+   COOK RECIPE (deduct ingredients from pantry)
+===================================================== */
+router.post('/cook', authenticateToken, async (req, res) => {
+  const { recipeId } = req.body;
+  const userId = req.user.id;
+
+  if (!recipeId) {
+    return res.status(400).json({ error: 'recipeId is required' });
+  }
+
+  try {
+    // 1. Look up the recipe
+    const recipeResult = await pool.query(
+      'SELECT * FROM recipes WHERE spoonacular_id = $1',
+      [recipeId]
+    );
+
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    const recipe = recipeResult.rows[0];
+    const ingredients = recipe.extended_ingredients || [];
+
+    // 2. Get user pantry items with ingredient names
+    const pantryResult = await pool.query(
+      `SELECT pi.id, i.name, pi.quantity, pi.unit
+       FROM pantry_items pi
+       JOIN ingredients i ON pi.ingredient_id = i.id
+       WHERE pi.user_id = $1`,
+      [userId]
+    );
+
+    const pantryItems = pantryResult.rows;
+    const updatedItems = [];
+    const removedItems = [];
+
+    // 3. For each recipe ingredient, find matching pantry item and deduct
+    for (const ing of ingredients) {
+      const words = splitWords(ing);
+
+      // Find a matching pantry item
+      const matchedPantry = pantryItems.find(p => {
+        const pName = p.name.toLowerCase();
+        return words.some(word =>
+          pName === word ||
+          pName === word.replace(/s$/, '') ||
+          word === pName.replace(/s$/, '')
+        );
+      });
+
+      if (matchedPantry) {
+        // Deduct 1 unit (since recipe ingredients don't always have exact amounts mapped)
+        const newQty = Math.max(0, matchedPantry.quantity - 1);
+
+        if (newQty <= 0) {
+          // Remove the item entirely
+          await pool.query(
+            'DELETE FROM pantry_items WHERE id = $1 AND user_id = $2',
+            [matchedPantry.id, userId]
+          );
+          removedItems.push(matchedPantry.name);
+        } else {
+          await pool.query(
+            `UPDATE pantry_items
+             SET quantity = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2 AND user_id = $3`,
+            [newQty, matchedPantry.id, userId]
+          );
+          updatedItems.push({ name: matchedPantry.name, newQuantity: newQty });
+        }
+
+        // Update local copy so we don't double-deduct the same item
+        matchedPantry.quantity = newQty;
+      }
+    }
+
+    res.json({
+      message: `${recipe.title} cooked successfully!`,
+      updatedItems,
+      removedItems
+    });
+
+  } catch (err) {
+    console.error('Cook recipe error:', err.message);
+    res.status(500).json({ error: 'Failed to cook recipe' });
+  }
+});
+
+/* =====================================================
    GET FULL RECIPE DETAIL
 ===================================================== */
 router.get('/:id', authenticateToken, async (req, res) => {
