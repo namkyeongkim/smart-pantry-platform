@@ -16,11 +16,13 @@ app.use(express.json());
 const userRoutes = require('./routes/users');
 const pantryRoutes = require('./routes/pantry');
 const recipeRoutes = require('./routes/recipes');
+const favoritesRoutes = require('./routes/favorites');
 
 // Use Routes
 app.use('/api/users', userRoutes);
 app.use('/api/pantry', pantryRoutes);
 app.use('/api/recipes', recipeRoutes);
+app.use('/api/favorites', favoritesRoutes);
 
 // Test Route
 app.get('/', (req, res) => {

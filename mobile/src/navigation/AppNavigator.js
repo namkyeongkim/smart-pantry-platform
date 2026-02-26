@@ -11,6 +11,8 @@ import RecipeSearchScreen from '../screens/RecipeSearchScreen';
 import RecipeResultsScreen from '../screens/RecipeResultsScreen';
 import CookRecipeScreen from '../screens/CookRecipeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
+import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -49,7 +51,7 @@ const AppNavigator = ({ token, user, onLogout }) => {
 
           <TouchableOpacity 
             style={[styles.navButton, styles.profileButton]}
-            onPress={() => navigation.navigate('Profile', { user, onLogout })}
+            onPress={() => navigation.navigate('Profile', { user })}
           >
             <Text style={styles.profileButtonText}>👤</Text>
           </TouchableOpacity>
@@ -82,8 +84,27 @@ const AppNavigator = ({ token, user, onLogout }) => {
         <Stack.Screen 
           name="Profile" 
           component={ProfileScreen}
-          options={{ 
+          options={({ navigation }) => ({
             title: 'Diet Profile',
+            headerStyle: {
+              backgroundColor: '#5a7559',
+            },
+            headerRight: () => (
+              <TouchableOpacity
+                style={{ marginRight: 16 }}
+                onPress={() => navigation.navigate('Favorites')}
+              >
+                <Text style={{ fontSize: 22 }}>❤️</Text>
+              </TouchableOpacity>
+            ),
+          })}
+        />
+
+        <Stack.Screen 
+          name="Favorites" 
+          component={FavoritesScreen}
+          options={{ 
+            title: 'My Favorites',
             headerStyle: {
               backgroundColor: '#5a7559',
             },
@@ -118,6 +139,11 @@ const AppNavigator = ({ token, user, onLogout }) => {
           name="CookRecipe" 
           component={CookRecipeScreen}
           options={{ title: 'Cook Recipe' }}
+        />
+
+        <Stack.Screen
+          name="RecipeDetail"
+          component={RecipeDetailScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>
