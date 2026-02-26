@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
 let authToken = null;
 
@@ -108,6 +108,32 @@ export const updateUserPreferences = async (flags) => {
     console.error('Error updating preferences:', error);
     throw error;
   }
+};
+
+// Favorites API calls
+export const addFavorite = async (recipe) => {
+  const response = await api.post('/api/favorites', {
+    recipe_id: recipe.id,
+    title: recipe.title,
+    image: recipe.image,
+  });
+  return response.data;
+};
+
+export const removeFavorite = async (recipeId) => {
+  const response = await api.delete(`/api/favorites/${recipeId}`);
+  return response.data;
+};
+
+export const getFavorites = async () => {
+  const response = await api.get('/api/favorites');
+  return response.data;
+};
+
+// Get full recipe details
+export const getRecipeDetail = async (id) => {
+  const response = await api.get(`/api/recipes/${id}`);
+  return response.data;
 };
 
 export default api;

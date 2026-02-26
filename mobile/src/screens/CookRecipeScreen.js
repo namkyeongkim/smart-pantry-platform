@@ -13,6 +13,7 @@ import { cookRecipe } from '../services/api';
 const CookRecipeScreen = ({ route, navigation }) => {
   const { recipe } = route.params;
   const [cooking, setCooking] = useState(false);
+  const hasAllIngredients = recipe.hasAllIngredients ?? false;
 
   const handleCookRecipe = async () => {
     Alert.alert(
@@ -25,7 +26,7 @@ const CookRecipeScreen = ({ route, navigation }) => {
           onPress: async () => {
             setCooking(true);
             try {
-              await cookRecipe(recipe.id);
+              await cookRecipe(recipe.id || recipe.recipe_id);
               Alert.alert(
                 'Success! 🎉',
                 `${recipe.title} cooked successfully! Your pantry has been updated.`,
@@ -65,39 +66,106 @@ const CookRecipeScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {recipe.usedIngredients && recipe.usedIngredients.length > 0 && (
+        {/* Ingredients You Have */}
+        {Array.isArray(recipe.availableIngredients) &&
+        recipe.availableIngredients.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>✅ Ingredients You Have:</Text>
-            {recipe.usedIngredients.map((ing, index) => (
-              <View key={index} style={styles.ingredientItem}>
-                <Text style={styles.ingredientText}>• {ing.original}</Text>
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>🟢 Ingredients You Have:</Text>
+            
+        {recipe.availableIngredients.map((ing, index) => {
+          const name =
+            typeof ing === 'string'
+              ? ing
+              : ing?.original || ing?.name;
+
+          return (
+            <View key={index} style={styles.ingredientItem}>
+              <Text style={styles.ingredientText}>• {name}</Text>
+            </View>
+          );
+        })}
           </View>
         )}
 
-        {recipe.missedIngredients && recipe.missedIngredients.length > 0 && (
+        {Array.isArray(recipe.missingIngredients) &&
+        recipe.missingIngredients.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>⚠️ Missing Ingredients:</Text>
             <View style={styles.warningBox}>
-              {recipe.missedIngredients.map((ing, index) => (
-                <Text key={index} style={styles.missingText}>
-                  • {ing.original}
-                </Text>
-              ))}
+              {recipe.missingIngredients.map((ing, index) => {
+                const name =
+                  typeof ing === 'string'
+                    ? ing
+                    : ing?.name || ing?.original || 'Unknown ingredient';
+
+                return (
+                  <Text key={index} style={styles.missingText}>
+                    • {name}
+                  </Text>
+                );
+              })}
               <Text style={styles.warningNote}>
-                Note: You'll need to buy these ingredients first!
+                You need these ingredients before cooking.
               </Text>
             </View>
           </View>
-        )}
+        )}  
 
-        {recipe.instructions && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📝 Instructions:</Text>
-            <Text style={styles.instructionsText}>{recipe.instructions}</Text>
-          </View>
-        )}
+      {/* Instructions - show ONLY if all ingredients available */}
+
+      {hasAllIngredients && (
+      <>
+        <View
+          style={{
+            backgroundColor: '#d4edda',
+            padding: 12,
+            borderRadius: 8,
+            marginBottom: 15,
+          }}
+        >
+          <Text style={{ color: '#155724', fontWeight: '600' }}>
+            ✅ You have all required ingredients!
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📝 Cooking Steps:</Text>
+
+          {recipe.analyzedInstructions &&
+          recipe.analyzedInstructions.length > 0 ? (
+            recipe.analyzedInstructions[0].steps.map((step, index) => (
+              <View key={index} style={styles.stepCard}>
+                <Text style={styles.stepLabel}>
+                  STEP {index + 1}
+                </Text>
+                <Text style={styles.stepDescription}>
+                  {step.step}
+                </Text>
+              </View>
+            ))
+          ) : recipe.instructions ? (
+            recipe.instructions
+              .replace(/<[^>]+>/g, '')
+              .split('. ')
+              .filter(Boolean)
+              .map((sentence, index) => (
+                <View key={index} style={styles.stepCard}>
+                  <Text style={styles.stepLabel}>
+                    STEP {index + 1}
+                  </Text>
+                  <Text style={styles.stepDescription}>
+                    {sentence.trim()}.
+                  </Text>
+                </View>
+              ))
+          ) : (
+            <Text>No instructions available.</Text>
+          )}
+        </View>
+      </>
+    )}
+
+        
 
         <View style={styles.warningSection}>
           <Text style={styles.warningTitle}>⚠️ Important:</Text>
@@ -108,9 +176,12 @@ const CookRecipeScreen = ({ route, navigation }) => {
         </View>
 
         <TouchableOpacity
-          style={[styles.cookButton, cooking && styles.cookButtonDisabled]}
+          style={[
+            styles.cookButton,
+            (cooking || !hasAllIngredients) && styles.cookButtonDisabled
+          ]}
           onPress={handleCookRecipe}
-          disabled={cooking}
+          disabled={cooking || !hasAllIngredients}
         >
           <Text style={styles.cookButtonText}>
             {cooking ? 'Updating Pantry...' : '✓ Confirm Cooking'}
@@ -257,6 +328,32 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     fontSize: 16,
     fontWeight: '600',
+  },
+
+  stepCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#27ae60',
+    marginBottom: 6,
+    letterSpacing: 1,
+  },
+
+  stepDescription: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#2c3e50',
   },
 });
 

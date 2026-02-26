@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useLayoutEffect } from 'react';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -23,7 +25,7 @@ const FLAG_MAP = {
 };
 
 const ProfileScreen = ({ navigation, route }) => {
-  const { user, onLogout } = route.params;
+  const { user } = route.params;
 
   const [preferences, setPreferences] = useState({
     vegetarian: false,
@@ -55,6 +57,38 @@ const ProfileScreen = ({ navigation, route }) => {
     };
     loadPreferences();
   }, []);
+
+useLayoutEffect(() => {
+  navigation.setOptions({
+    headerRight: () => (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Favorites')}
+        style={{
+          marginRight: 16,
+          flexDirection: 'row',
+          alignItems: 'center'
+        }}
+      >
+        <Ionicons
+          name="heart"
+          size={20}        
+          color="red"
+          style={{ marginTop: 1 }}  
+        />
+        <Text
+          style={{
+            marginLeft: 6,
+            color: 'white',
+            fontWeight: '600',
+            fontSize: 17
+          }}
+        >
+          Favorites
+        </Text>
+      </TouchableOpacity>
+    ),
+  });
+}, [navigation]);
 
   const togglePreference = useCallback(async (key) => {
     if (saving) return;
