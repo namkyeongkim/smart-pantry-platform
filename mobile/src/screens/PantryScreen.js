@@ -34,7 +34,8 @@ const PantryScreen = ({ navigation }) => {
       const items = await getPantryItems();
       setPantryItems(items);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load pantry items. Make sure your backend is running!');
+      console.log('Offline mode: pantry unavailable');
+      setPantryItems([]);
     } finally {
       setLoading(false);
     }
@@ -93,8 +94,8 @@ const PantryScreen = ({ navigation }) => {
         </View>
       ) : pantryItems.length === 0 ? (
         <View style={styles.centerContent}>
-          <Text style={styles.emptyText}>Your pantry is empty!</Text>
-          <Text style={styles.emptySubtext}>Add some ingredients to get started</Text>
+          <Text style={styles.emptyText}>Unable to load pantry</Text>
+          <Text style={styles.emptySubtext}>Please connect to the internet</Text>
         </View>
       ) : (
         <FlatList

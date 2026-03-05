@@ -287,6 +287,22 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.featureButtonText}>Find Recipes</Text>
               </TouchableOpacity>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate('Favorites')}
+            >
+              <View style={styles.featureIcon}>
+                <Text style={styles.featureEmoji}>❤️</Text>
+              </View>
+              <Text style={styles.featureTitle}>Favorites</Text>
+              <TouchableOpacity
+                style={styles.featureButton}
+                onPress={() => navigation.navigate('Favorites')}
+              >
+                <Text style={styles.featureButtonText}>View Favorites</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -575,13 +591,16 @@ const styles = StyleSheet.create({
   },
   featureGrid: {
     flexDirection: 'row',
-    gap: 16
+    flexWrap: 'wrap',
+    justifyContent: 'space-between'
   },
+
   featureCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
-    flex: 1,
+    width: '47%',
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
