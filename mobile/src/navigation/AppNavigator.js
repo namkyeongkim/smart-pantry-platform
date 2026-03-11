@@ -13,6 +13,8 @@ import CookRecipeScreen from '../screens/CookRecipeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
+import EditIngredientsScreen from '../screens/EditIngredientsScreen';
+import EditInstructionsScreen from '../screens/EditInstructionsScreen';
 
 const Stack = createStackNavigator();
 
@@ -145,6 +147,16 @@ const AppNavigator = ({ token, user, onLogout }) => {
         <Stack.Screen
           name="RecipeDetail"
           component={RecipeDetailScreen}
+        />
+
+        <Stack.Screen
+          name="EditIngredients"
+          component={EditIngredientsScreen}
+        />
+
+        <Stack.Screen
+          name="EditInstructions"
+          component={EditInstructionsScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

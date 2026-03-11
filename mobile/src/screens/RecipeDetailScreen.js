@@ -9,18 +9,20 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRecipeDetail } from '../services/api';
 
 const RecipeDetailScreen = ({ route, navigation }) => {
 
-  // Recipe passed from previous screen
   const { recipe } = route.params;
 
   const [fullRecipe, setFullRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
 
-  // Load recipe detail from API
+  const recipeId = recipe.recipe_id || recipe.id;
+
+
   useEffect(() => {
 
     const loadDetail = async () => {
@@ -29,21 +31,27 @@ const RecipeDetailScreen = ({ route, navigation }) => {
 
       try {
 
-        // Fetch full recipe from backend
-        const data = await getRecipeDetail(
-          recipe.recipe_id || recipe.id
-        );
+        // Check if a customized version of this recipe exists in local storage
+        const savedRecipe = await AsyncStorage.getItem(`recipe_${recipeId}`);
 
-        setFullRecipe(data);
+        if (savedRecipe) {
+
+          // Load the customized recipe
+          setFullRecipe(JSON.parse(savedRecipe));
+
+        } else {
+
+          // Otherwise load the original recipe from the API
+          const data = await getRecipeDetail(recipeId);
+          setFullRecipe(data);
+
+        }
 
       } catch (error) {
 
-        // If API fails → offline mode
+        // If API fails, switch to offline mode
         console.log('Offline mode');
-
         setOffline(true);
-
-        // Use recipe passed from favorites
         setFullRecipe(recipe);
 
       } finally {
@@ -51,13 +59,34 @@ const RecipeDetailScreen = ({ route, navigation }) => {
         setLoading(false);
 
       }
+
     };
 
     loadDetail();
 
   }, [recipe]);
 
-  // Loading screen
+
+  // Reset recipe to original version
+  const revertRecipe = async () => {
+
+    try {
+
+      // Remove customized recipe from local storage
+      await AsyncStorage.removeItem(`recipe_${recipeId}`);
+
+      // Restore original recipe
+      setFullRecipe(recipe);
+
+    } catch (error) {
+
+      console.log('Revert failed', error);
+
+    }
+
+  };
+
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -66,7 +95,6 @@ const RecipeDetailScreen = ({ route, navigation }) => {
     );
   }
 
-  // Error state
   if (!fullRecipe) {
     return (
       <View style={styles.center}>
@@ -75,13 +103,14 @@ const RecipeDetailScreen = ({ route, navigation }) => {
     );
   }
 
+
   return (
 
     <ScrollView style={styles.container}>
 
       <View style={styles.content}>
 
-        {/* Recipe image */}
+        {/* Recipe Image */}
         {fullRecipe.image && (
           <Image
             source={{ uri: fullRecipe.image }}
@@ -89,10 +118,10 @@ const RecipeDetailScreen = ({ route, navigation }) => {
           />
         )}
 
-        {/* Recipe title */}
+        {/* Recipe Title */}
         <Text style={styles.title}>{fullRecipe.title}</Text>
 
-        {/* Meta info */}
+        {/* Recipe Meta Info */}
         <View style={styles.metaContainer}>
 
           <View style={styles.metaBadge}>
@@ -109,34 +138,122 @@ const RecipeDetailScreen = ({ route, navigation }) => {
 
         </View>
 
-        {/* Ingredients */}
+
+        {/* INGREDIENTS SECTION */}
+
         <View style={styles.section}>
 
-          <Text style={styles.sectionTitle}>🛒 Ingredients:</Text>
+          <View style={styles.sectionHeader}>
 
-          {fullRecipe.extendedIngredients?.length > 0 &&
-            fullRecipe.extendedIngredients.map((ing, index) => {
+            <Text style={styles.sectionTitle}>🛒 Ingredients</Text>
 
-              const name =
-                typeof ing === 'string'
-                  ? ing
-                  : ing.original || ing.name;
+            <View style={{flexDirection:'row', gap:10}}>
 
-              return (
-                <View key={index} style={styles.ingredientItem}>
-                  <Text style={styles.ingredientText}>• {name}</Text>
-                </View>
-              );
-            })
-          }
+              {/* Navigate to edit ingredients screen */}
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('EditIngredients', {
+                    ingredients: fullRecipe.extendedIngredients || [],
+                    onSave: async (updated) => {
+
+                      const updatedRecipe = {
+                        ...fullRecipe,
+                        extendedIngredients: updated
+                      };
+
+                      // Update UI
+                      setFullRecipe(updatedRecipe);
+
+                      // Save customized recipe locally
+                      await AsyncStorage.setItem(
+                        `recipe_${recipeId}`,
+                        JSON.stringify(updatedRecipe)
+                      );
+
+                    }
+                  })
+                }
+              >
+                <Text style={styles.editButton}>Edit</Text>
+              </TouchableOpacity>
+
+              {/* Reset recipe */}
+              <TouchableOpacity onPress={revertRecipe}>
+                <Text style={styles.resetButton}>Reset</Text>
+              </TouchableOpacity>
+
+            </View>
+
+          </View>
+
+
+          {/* Ingredient List */}
+          {(fullRecipe.extendedIngredients || []).map((ing, index) => {
+
+            const name =
+              typeof ing === 'string'
+                ? ing
+                : ing.original || ing.name;
+
+            return (
+              <View key={index} style={styles.ingredientItem}>
+                <Text style={styles.ingredientText}>• {name}</Text>
+              </View>
+            );
+
+          })}
 
         </View>
 
-        {/* Instructions */}
+
+
+        {/* INSTRUCTIONS SECTION */}
+
         <View style={styles.section}>
 
-          <Text style={styles.sectionTitle}>📝 Instructions:</Text>
+          <View style={styles.sectionHeader}>
 
+            <Text style={styles.sectionTitle}>📝 Instructions</Text>
+
+            <View style={{flexDirection:'row', gap:10}}>
+
+              {/* Navigate to edit instructions */}
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('EditInstructions', {
+                    instructions: fullRecipe.instructions || '',
+                    onSave: async (updated) => {
+
+                      const updatedRecipe = {
+                        ...fullRecipe,
+                        instructions: updated
+                      };
+
+                      setFullRecipe(updatedRecipe);
+
+                      await AsyncStorage.setItem(
+                        `recipe_${recipeId}`,
+                        JSON.stringify(updatedRecipe)
+                      );
+
+                    }
+                  })
+                }
+              >
+                <Text style={styles.editButton}>Edit</Text>
+              </TouchableOpacity>
+
+              {/* Reset instructions */}
+              <TouchableOpacity onPress={revertRecipe}>
+                <Text style={styles.resetButton}>Reset</Text>
+              </TouchableOpacity>
+
+            </View>
+
+          </View>
+
+
+          {/* Instruction Steps */}
           {fullRecipe.analyzedInstructions?.length > 0 ? (
 
             fullRecipe.analyzedInstructions[0].steps.map((step, index) => (
@@ -158,7 +275,7 @@ const RecipeDetailScreen = ({ route, navigation }) => {
           ) : fullRecipe.instructions ? (
 
             fullRecipe.instructions
-              .replace(/<[^>]+>/g, '')
+              .replace(/<[^>]*>/g, '')
               .split('. ')
               .filter(Boolean)
               .map((sentence, index) => (
@@ -187,7 +304,8 @@ const RecipeDetailScreen = ({ route, navigation }) => {
 
         </View>
 
-        {/* Start cooking button (hidden in offline mode) */}
+
+        {/* Start Cooking Button */}
         {!offline && (
 
           <TouchableOpacity
@@ -214,119 +332,110 @@ const RecipeDetailScreen = ({ route, navigation }) => {
   );
 };
 
+
 const styles = StyleSheet.create({
 
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+  container:{ flex:1, backgroundColor:'#f5f5f5' },
+
+  content:{ padding:15 },
+
+  image:{
+    width:'100%',
+    height:250,
+    borderRadius:12,
+    marginBottom:15
   },
 
-  content: {
-    padding: 15,
+  title:{
+    fontSize:24,
+    fontWeight:'bold',
+    marginBottom:15
   },
 
-  image: {
-    width: '100%',
-    height: 250,
-    borderRadius: 12,
-    marginBottom: 15,
-    backgroundColor: '#e0e0e0',
+  metaContainer:{
+    flexDirection:'row',
+    gap:10,
+    marginBottom:20
   },
 
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 15,
+  metaBadge:{
+    backgroundColor:'#ecf0f1',
+    paddingHorizontal:15,
+    paddingVertical:8,
+    borderRadius:8
   },
 
-  metaContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+  section:{ marginBottom:20 },
+
+  sectionHeader:{
+    flexDirection:'row',
+    justifyContent:'space-between',
+    alignItems:'center',
+    marginBottom:10
   },
 
-  metaBadge: {
-    backgroundColor: '#ecf0f1',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
+  sectionTitle:{
+    fontSize:18,
+    fontWeight:'bold'
   },
 
-  metaText: {
-    fontSize: 14,
-    color: '#2c3e50',
-    fontWeight: '600',
+  editButton:{
+    color:'#27ae60',
+    fontWeight:'600'
   },
 
-  section: {
-    marginBottom: 20,
+  resetButton:{
+    color:'#e74c3c',
+    fontWeight:'600'
   },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 10,
+  ingredientItem:{
+    backgroundColor:'#d4edda',
+    padding:10,
+    borderRadius:8,
+    marginBottom:5
   },
 
-  ingredientItem: {
-    backgroundColor: '#d4edda',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 5,
+  ingredientText:{
+    color:'#155724'
   },
 
-  ingredientText: {
-    fontSize: 15,
-    color: '#155724',
+  stepCard:{
+    backgroundColor:'white',
+    padding:16,
+    borderRadius:12,
+    marginBottom:14
   },
 
-  button: {
-    backgroundColor: '#27ae60',
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
+  stepLabel:{
+    fontWeight:'bold',
+    color:'#27ae60',
+    marginBottom:6
   },
 
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+  stepDescription:{
+    fontSize:16,
+    lineHeight:24
   },
 
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  button:{
+    backgroundColor:'#27ae60',
+    padding:18,
+    borderRadius:10,
+    alignItems:'center'
   },
 
-  stepCard: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+  buttonText:{
+    color:'white',
+    fontSize:18,
+    fontWeight:'bold'
   },
 
-  stepLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#27ae60',
-    marginBottom: 6,
-    letterSpacing: 1,
-  },
-
-  stepDescription: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#2c3e50',
-  },
+  center:{
+    flex:1,
+    justifyContent:'center',
+    alignItems:'center'
+  }
 
 });
 
