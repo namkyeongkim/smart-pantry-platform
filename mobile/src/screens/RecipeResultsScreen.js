@@ -138,7 +138,7 @@ const RecipeResultsScreen = ({ route, navigation }) => {
         style={styles.recipeCard}
         activeOpacity={0.9}
         onPress={() =>
-          navigation.navigate('RecipeDetail', { recipe: item })
+          navigation.navigate('CookRecipe', { recipe: item })
         }
       >
 
