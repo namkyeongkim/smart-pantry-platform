@@ -1,11 +1,11 @@
 {
-  "name": "pantry-manager-server",
+  "name": "pantry-app-backend",
   "version": "1.0.0",
-  "description": "Backend for Pantry Manager",
-  "main": "index.js",
+  "description": "Backend for Pantry App PoC",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "axios": "^1.13.5",
