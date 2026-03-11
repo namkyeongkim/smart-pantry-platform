@@ -12,6 +12,8 @@ import {
   Alert,
   Modal
 } from 'react-native';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getPantryItems, deletePantryItem, updatePantryQuantity } from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
@@ -23,10 +25,28 @@ const HomeScreen = ({ navigation }) => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [deleteQuantity, setDeleteQuantity] = useState('1');
+  const [recentlyCooked, setRecentlyCooked] = useState([]);
 
   useEffect(() => {
     loadPantryItems();
+    loadCookingHistory();
   }, []);
+
+  const loadCookingHistory = async () => {
+  try {
+
+    const history = await AsyncStorage.getItem('cooking_history');
+
+    if (history) {
+      const parsed = JSON.parse(history);
+
+      setRecentlyCooked(parsed.slice(0,3));
+    }
+
+  } catch (error) {
+    console.log('Failed to load cooking history', error);
+  }
+};
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -251,11 +271,65 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
 
+        {/* Recently Cooked */}
+
+        {recentlyCooked.length > 0 && (
+
+        <View style={styles.section}>
+
+        <View style={styles.sectionHeader}>
+
+        <Text style={styles.sectionTitle}>
+        Recently Cooked
+        </Text>
+
+        <TouchableOpacity
+        onPress={() => navigation.navigate('CookingHistory')}
+        >
+
+        <Text style={styles.viewAllText}>
+        View All →
+        </Text>
+
+        </TouchableOpacity>
+
+        </View>
+
+        {recentlyCooked.map((item,index)=>(
+
+        <TouchableOpacity
+        key={index}
+        style={styles.recentCard}
+        onPress={() =>
+        navigation.navigate("RecipeDetail", {
+        recipe: item
+        })
+        }
+        >
+
+        <Text style={styles.recentTitle}>
+        🍳 {item.title}
+        </Text>
+
+        <Text style={styles.recentTime}>
+        ⏱ {item.readyInMinutes} min
+        </Text>
+
+        </TouchableOpacity>
+
+        ))}
+
+        </View>
+
+        )}
+
         {/* Quick Actions Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
 
           <View style={styles.featureGrid}>
+
+            {/* Manage Pantry */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('Pantry')}
@@ -263,15 +337,16 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>🗄️</Text>
               </View>
+
               <Text style={styles.featureTitle}>Manage Pantry</Text>
-              <TouchableOpacity
-                style={styles.featureButton}
-                onPress={() => navigation.navigate('Pantry')}
-              >
+
+              <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>Go to Pantry</Text>
-              </TouchableOpacity>
+              </View>
             </TouchableOpacity>
 
+
+            {/* Search Recipes */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('RecipeSearch')}
@@ -279,15 +354,16 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>🔍</Text>
               </View>
+
               <Text style={styles.featureTitle}>Search Recipes</Text>
-              <TouchableOpacity
-                style={styles.featureButton}
-                onPress={() => navigation.navigate('RecipeSearch')}
-              >
+
+              <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>Find Recipes</Text>
-              </TouchableOpacity>
+              </View>
             </TouchableOpacity>
 
+
+            {/* Favorites */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('Favorites')}
@@ -295,14 +371,31 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>❤️</Text>
               </View>
+
               <Text style={styles.featureTitle}>Favorites</Text>
-              <TouchableOpacity
-                style={styles.featureButton}
-                onPress={() => navigation.navigate('Favorites')}
-              >
+
+              <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>View Favorites</Text>
-              </TouchableOpacity>
+              </View>
             </TouchableOpacity>
+
+
+            {/* Cooking History */}
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate('CookingHistory')}
+            >
+              <View style={styles.featureIcon}>
+                <Text style={styles.featureEmoji}>🍳</Text>
+              </View>
+
+              <Text style={styles.featureTitle}>Cooking History</Text>
+
+              <View style={styles.featureButton}>
+                <Text style={styles.featureButtonText}>View History</Text>
+              </View>
+            </TouchableOpacity>
+
           </View>
         </View>
 
@@ -736,6 +829,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  recentCard:{
+    backgroundColor:'#fff',
+    padding:14,
+    borderRadius:10,
+    marginBottom:10,
+    shadowColor:'#000',
+    shadowOffset:{width:0,height:1},
+    shadowOpacity:0.05,
+    shadowRadius:3,
+    elevation:2
+    },
+
+    recentTitle:{
+    fontSize:16,
+    fontWeight:'600',
+    color:'#3d4a3e'
+    },
+
+    recentTime:{
+    fontSize:13,
+    color:'#7a8b7c',
+    marginTop:4
+    },
 });
 
 export default HomeScreen;

@@ -9,73 +9,156 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cookRecipe, getRecipeDetail } from '../services/api';
 
 const CookRecipeScreen = ({ route, navigation }) => {
+
   const { recipe: passedRecipe } = route.params;
+
   const [recipe, setRecipe] = useState(passedRecipe);
   const [cooking, setCooking] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
   const hasAllIngredients = recipe.hasAllIngredients ?? false;
 
-  // Fetch full recipe details if instructions are missing (e.g. coming from search)
+  // Save cooked recipe to local cooking history
+  const saveCookHistory = async (recipe) => {
+
+    try {
+
+      const history = await AsyncStorage.getItem('cooking_history');
+      let historyList = history ? JSON.parse(history) : [];
+
+      const newItem = {
+        recipe_id: recipe.id || recipe.recipe_id,
+        title: recipe.title,
+        image: recipe.image,
+        readyInMinutes: recipe.readyInMinutes,
+        date: new Date().toISOString(),
+      };
+
+      // remove duplicates
+      historyList = historyList.filter(
+        item => item.recipe_id !== newItem.recipe_id
+      );
+
+      // add newest item to the top
+      historyList.unshift(newItem);
+
+      // keep only latest 20 items
+      historyList = historyList.slice(0,20);
+
+      await AsyncStorage.setItem(
+        'cooking_history',
+        JSON.stringify(historyList)
+      );
+
+    } catch (error) {
+
+      console.log('Save cooking history error', error);
+
+    }
+
+  };
+
+  // Fetch full recipe details if instructions missing
   useEffect(() => {
+
     const needsDetail =
       !recipe.analyzedInstructions && !recipe.instructions;
 
     if (needsDetail) {
+
       const fetchDetail = async () => {
+
         setLoadingDetail(true);
+
         try {
-          const full = await getRecipeDetail(recipe.id || recipe.recipe_id);
-          // Merge full detail with existing data (keep hasAllIngredients etc.)
+
+          const full = await getRecipeDetail(
+            recipe.id || recipe.recipe_id
+          );
+
           setRecipe(prev => ({ ...prev, ...full }));
+
         } catch (err) {
+
           console.error('Failed to load recipe detail:', err);
+
         } finally {
+
           setLoadingDetail(false);
+
         }
+
       };
+
       fetchDetail();
+
     }
+
   }, []);
 
   const handleCookRecipe = async () => {
+
     Alert.alert(
       'Confirm Cooking',
       'This will deduct ingredients from your pantry. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
+
         {
           text: 'Cook It!',
           onPress: async () => {
+
             setCooking(true);
+
             try {
+
               await cookRecipe(recipe.id || recipe.recipe_id);
+
+              // save cooking history
+              await saveCookHistory(recipe);
+
               Alert.alert(
                 'Success! 🎉',
                 `${recipe.title} cooked successfully! Your pantry has been updated.`,
                 [
                   {
                     text: 'OK',
-                    onPress: () => navigation.navigate('Pantry'),
+                    onPress: () => navigation.navigate('CookingHistory'),
                   },
                 ]
               );
+
             } catch (error) {
-              Alert.alert('Error', 'Failed to update pantry. Please try again.');
+
+              Alert.alert(
+                'Error',
+                'Failed to update pantry. Please try again.'
+              );
+
             } finally {
+
               setCooking(false);
+
             }
+
           },
         },
       ]
     );
+
   };
 
   return (
+
     <ScrollView style={styles.container}>
+
       <View style={styles.content}>
+
         {recipe.image && (
           <Image source={{ uri: recipe.image }} style={styles.image} />
         )}
@@ -83,127 +166,162 @@ const CookRecipeScreen = ({ route, navigation }) => {
         <Text style={styles.title}>{recipe.title}</Text>
 
         <View style={styles.metaContainer}>
+
           <View style={styles.metaBadge}>
-            <Text style={styles.metaText}>⏱️ {recipe.readyInMinutes} min</Text>
+            <Text style={styles.metaText}>
+              ⏱️ {recipe.readyInMinutes} min
+            </Text>
           </View>
+
           <View style={styles.metaBadge}>
-            <Text style={styles.metaText}>🍽️ {recipe.servings} servings</Text>
+            <Text style={styles.metaText}>
+              🍽️ {recipe.servings} servings
+            </Text>
           </View>
+
         </View>
 
-        {/* Ingredients You Have */}
+        {/* Ingredients you have */}
+
         {Array.isArray(recipe.availableIngredients) &&
           recipe.availableIngredients.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🟢 Ingredients You Have:</Text>
 
-              {recipe.availableIngredients.map((ing, index) => {
-                const name =
-                  typeof ing === 'string'
-                    ? ing
-                    : ing?.original || ing?.name;
+          <View style={styles.section}>
 
-                return (
-                  <View key={index} style={styles.ingredientItem}>
-                    <Text style={styles.ingredientText}>• {name}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
+            <Text style={styles.sectionTitle}>
+              🟢 Ingredients You Have:
+            </Text>
+
+            {recipe.availableIngredients.map((ing, index) => {
+
+              const name =
+                typeof ing === 'string'
+                  ? ing
+                  : ing?.original || ing?.name;
+
+              return (
+
+                <View key={index} style={styles.ingredientItem}>
+                  <Text style={styles.ingredientText}>• {name}</Text>
+                </View>
+
+              );
+
+            })}
+
+          </View>
+
+        )}
+
+        {/* Missing ingredients */}
 
         {Array.isArray(recipe.missingIngredients) &&
           recipe.missingIngredients.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>⚠️ Missing Ingredients:</Text>
-              <View style={styles.warningBox}>
-                {recipe.missingIngredients.map((ing, index) => {
-                  const name =
-                    typeof ing === 'string'
-                      ? ing
-                      : ing?.name || ing?.original || 'Unknown ingredient';
 
-                  return (
-                    <Text key={index} style={styles.missingText}>
-                      • {name}
-                    </Text>
-                  );
-                })}
-                <Text style={styles.warningNote}>
-                  You need these ingredients before cooking.
-                </Text>
-              </View>
+          <View style={styles.section}>
+
+            <Text style={styles.sectionTitle}>
+              ⚠️ Missing Ingredients:
+            </Text>
+
+            <View style={styles.warningBox}>
+
+              {recipe.missingIngredients.map((ing, index) => {
+
+                const name =
+                  typeof ing === 'string'
+                    ? ing
+                    : ing?.name || ing?.original;
+
+                return (
+                  <Text key={index} style={styles.missingText}>
+                    • {name}
+                  </Text>
+                );
+
+              })}
+
+              <Text style={styles.warningNote}>
+                You need these ingredients before cooking.
+              </Text>
+
             </View>
-          )}
 
-        {/* Instructions - show ONLY if all ingredients available */}
+          </View>
+
+        )}
+
+        {/* Instructions */}
 
         {hasAllIngredients && (
+
           <>
-            <View
-              style={{
-                backgroundColor: '#d4edda',
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 15,
-              }}
-            >
-              <Text style={{ color: '#155724', fontWeight: '600' }}>
+
+            <View style={styles.readyBox}>
+              <Text style={styles.readyText}>
                 ✅ You have all required ingredients!
               </Text>
             </View>
 
             <View style={styles.section}>
+
               <Text style={styles.sectionTitle}>📝 Cooking Steps:</Text>
 
               {loadingDetail ? (
-                <View style={{ alignItems: 'center', padding: 20 }}>
-                  <ActivityIndicator size="large" color="#27ae60" />
-                  <Text style={{ marginTop: 10, color: '#666' }}>Loading instructions...</Text>
-                </View>
+
+                <ActivityIndicator size="large" color="#27ae60" />
+
               ) : recipe.analyzedInstructions &&
                 recipe.analyzedInstructions.length > 0 ? (
-                recipe.analyzedInstructions[0].steps.map((step, index) => (
+
+                recipe.analyzedInstructions[0].steps.map((step,index)=>(
                   <View key={index} style={styles.stepCard}>
-                    <Text style={styles.stepLabel}>
-                      STEP {index + 1}
-                    </Text>
-                    <Text style={styles.stepDescription}>
-                      {step.step}
-                    </Text>
+                    <Text style={styles.stepLabel}>STEP {index+1}</Text>
+                    <Text style={styles.stepDescription}>{step.step}</Text>
                   </View>
                 ))
+
               ) : recipe.instructions ? (
+
                 recipe.instructions
-                  .replace(/<[^>]+>/g, '')
+                  .replace(/<[^>]+>/g,'')
                   .split('. ')
                   .filter(Boolean)
-                  .map((sentence, index) => (
+                  .map((sentence,index)=>(
                     <View key={index} style={styles.stepCard}>
-                      <Text style={styles.stepLabel}>
-                        STEP {index + 1}
-                      </Text>
+                      <Text style={styles.stepLabel}>STEP {index+1}</Text>
                       <Text style={styles.stepDescription}>
                         {sentence.trim()}.
                       </Text>
                     </View>
                   ))
+
               ) : (
+
                 <Text>No instructions available.</Text>
+
               )}
+
             </View>
+
           </>
+
         )}
 
-
+        {/* Warning */}
 
         <View style={styles.warningSection}>
+
           <Text style={styles.warningTitle}>⚠️ Important:</Text>
+
           <Text style={styles.warningText}>
-            Clicking "Confirm Cooking" will automatically deduct the ingredients you
-            have from your pantry inventory.
+            Clicking "Confirm Cooking" will automatically deduct the ingredients
+            you have from your pantry inventory.
           </Text>
+
         </View>
+
+        {/* Cook Button */}
 
         <TouchableOpacity
           style={[
@@ -213,20 +331,30 @@ const CookRecipeScreen = ({ route, navigation }) => {
           onPress={handleCookRecipe}
           disabled={cooking || !hasAllIngredients}
         >
+
           <Text style={styles.cookButtonText}>
             {cooking ? 'Updating Pantry...' : '✓ Confirm Cooking'}
           </Text>
+
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+
+          <Text style={styles.cancelButtonText}>
+            Cancel
+          </Text>
+
         </TouchableOpacity>
+
       </View>
+
     </ScrollView>
+
   );
+
 };
 
 const styles = StyleSheet.create({
@@ -385,6 +513,19 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: '#2c3e50',
   },
+  readyBox: {
+    backgroundColor: '#d4edda',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,   
+  },
+
+  readyText: {
+    color: '#155724',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
+
 
 export default CookRecipeScreen;

@@ -15,6 +15,7 @@ import FavoritesScreen from '../screens/FavoritesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import EditIngredientsScreen from '../screens/EditIngredientsScreen';
 import EditInstructionsScreen from '../screens/EditInstructionsScreen';
+import CookingHistoryScreen from '../screens/CookingHistoryScreen';
 
 const Stack = createStackNavigator();
 
@@ -157,6 +158,11 @@ const AppNavigator = ({ token, user, onLogout }) => {
         <Stack.Screen
           name="EditInstructions"
           component={EditInstructionsScreen}
+        />
+
+        <Stack.Screen
+          name="CookingHistory"
+          component={CookingHistoryScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>
