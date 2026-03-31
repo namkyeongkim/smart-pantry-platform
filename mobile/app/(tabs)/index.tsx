@@ -9,7 +9,8 @@ import { useState } from 'react';
 // 3. Replace the IP address below with YOUR computer's IP.
 // ==============================================================================
 // using ngrok for stable remote access
-const API_URL = 'https://supercommercial-suellen-lacelike.ngrok-free.dev/api/recommend';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = `${BASE_URL}/api/recipes/search-mood`;
 
 interface Ingredient {
   name: string;
@@ -49,7 +50,10 @@ export default function HomeScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-
+  const [isFavoriteView, setIsFavoriteView] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+    
+    
   const handleFindDinner = async () => {
     setLoading(true);
     setError(null);
@@ -75,12 +79,17 @@ export default function HomeScreen() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data: RecommendationResponse = await response.json();
+      const data = await response.json();
       console.log('Data received:', data);
-      setRecipes(data.recipes);
-      if (data.recipes.length === 0 && data.message) {
-        setError(data.message);
+
+      if (Array.isArray(data)) {
+        setRecipes(data);
+      } else {
+        console.log("Backend returned error object:", data);
+        setRecipes([]);
+        setError("Backend error occurred");
       }
+        
     } catch (err) {
       console.error(err);
       setError("Failed to connect to backend. Make sure the server is running and the IP address is correct.");
@@ -89,14 +98,122 @@ export default function HomeScreen() {
     }
   };
 
+
+  // Add recipe to favorites
+  const addToFavorites = async (recipe: Recipe) => {
+    try {
+      await fetch(`${BASE_URL}/api/favorites`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 1,
+          recipeId: recipe.id,
+          title: recipe.title,
+          image: recipe.image
+        })
+      });
+      setFavoriteIds(prev => {
+        if (prev.includes(recipe.id)) return prev;
+        return [...prev, recipe.id];
+      });
+    
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  // Load saved favorite recipes from the backend
+  const loadFavorites = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/favorites/1`);
+      const data = await res.json();
+      const formatted = data.map((item: any) => ({
+        id: item.recipe_id,
+        title: item.recipe_title,
+        image: item.recipe_image,
+        readyInMinutes: null,
+        servings: null,
+        missedIngredientCount: 0,
+        usedIngredientCount: 0,
+        extendedIngredients: [],
+        missedIngredients: [],
+        analyzedInstructions: [],
+        summary: ''
+      }));
+      
+      setRecipes(formatted);
+      setFavoriteIds(formatted.map((r: any) => r.id));
+    } catch (err) {
+      console.error(err);
+    }
+   };
+
+   // Remove recipe from favorites
+   const removeFromFavorites = async (recipe: Recipe) => {
+    try {
+      await fetch(`${BASE_URL}/api/favorites/${recipe.id}`, {
+        method: 'DELETE'
+      });
+      setFavoriteIds(prev => prev.filter(id => id !== recipe.id));
+      
+      if (isFavoriteView) {
+        setRecipes(prev => prev.filter(r => r.id !== recipe.id));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  // Open recipe detail view
+  const openRecipeDetails = async (recipe: Recipe) => {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/recipes/details/${recipe.id}`
+      );
+      
+      const data = await res.json();
+      setSelectedRecipe(data);
+    
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Pantry Pal(Or any other name we come up with) 🥣</Text>
-      <Text style={styles.subtitle}>Find your next meal</Text>
+  <View style={styles.container}>
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+      }}
+    >
+      <Text style={styles.title}>Pantry Pal 🥣</Text>
 
+      <TouchableOpacity
+        onPress={() => {
+          setIsFavoriteView(true);
+          loadFavorites();
+        }}
+      >
+        <Text style={{ fontSize: 26 }}>❤️</Text>
+      </TouchableOpacity>
+    </View>
+
+    {isFavoriteView && (
+      <Button
+        title="Back to Search"
+        onPress={() => {
+          setIsFavoriteView(false);
+          setRecipes([]);
+        }}
+      />
+    )}
+
+    {!isFavoriteView && (
       <View style={styles.inputContainer}>
-
-
         <Text style={styles.label}>What are you in the mood for?</Text>
         <TextInput
           style={styles.input}
@@ -120,74 +237,136 @@ export default function HomeScreen() {
           disabled={loading}
         />
       </View>
+    )}
 
-      {loading && <ActivityIndicator size="large" color="#0000ff" style={{ marginTop: 20 }} />}
-      {error && <Text style={styles.error}>{error}</Text>}
+    {loading && (
+      <ActivityIndicator size="large" color="#0000ff" style={{ marginTop: 20 }} />
+    )}
 
-      <ScrollView style={styles.resultContainer}>
-        {recipes.map((recipe) => (
-          <TouchableOpacity key={recipe.id} style={styles.card} onPress={() => setSelectedRecipe(recipe)}>
-            <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{recipe.title}</Text>
-              <Text style={styles.cardInfo}>🕒 {recipe.readyInMinutes} mins | 👥 {recipe.servings} servings</Text>
+    {error && <Text style={styles.error}>{error}</Text>}
+
+    <ScrollView style={styles.resultContainer}>
+      {recipes.map((recipe) => (
+        <TouchableOpacity
+          key={recipe.id}
+          style={styles.card}
+          onPress={() => openRecipeDetails(recipe)}
+        >
+          <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
+
+          <View style={styles.cardContent}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+              }}
+            >
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {recipe.title}
+              </Text>
+
+              <TouchableOpacity
+                style={{ width: 30, alignItems: 'flex-end', marginTop: 2 }}
+                onPress={() =>
+                  favoriteIds.includes(recipe.id)
+                    ? removeFromFavorites(recipe)
+                    : addToFavorites(recipe)
+                }
+              >
+                <Text style={{ fontSize: 22 }}>
+                  {favoriteIds.includes(recipe.id) ? '❤️' : '🤍'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.cardInfo}>
+              {recipe.readyInMinutes
+                ? `🕒 ${recipe.readyInMinutes} mins | 👥 ${recipe.servings}`
+                : 'Saved recipe'}
+            </Text>
+
+            {!isFavoriteView && (
               <Text style={styles.missingInfo}>
                 Needs {recipe.missedIngredientCount} more ingredients
               </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            )}
+          </View>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
 
-      {/* Recipe Detail Modal */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={selectedRecipe !== null}
-        onRequestClose={() => setSelectedRecipe(null)}
-      >
-        <View style={styles.modalContainer}>
-          {selectedRecipe && (
-            <ScrollView contentContainerStyle={styles.modalScroll}>
-              <Image source={{ uri: selectedRecipe.image }} style={styles.modalImage} />
-              <Text style={styles.modalTitle}>{selectedRecipe.title}</Text>
-              <Text style={styles.modalSubtitle}>
-                Ready in {selectedRecipe.readyInMinutes} mins | Servings: {selectedRecipe.servings}
-              </Text>
+    <Modal
+      animationType="slide"
+      transparent={false}
+      visible={selectedRecipe !== null}
+      onRequestClose={() => setSelectedRecipe(null)}
+    >
+      <View style={styles.modalContainer}>
+        {selectedRecipe && (
+          <ScrollView contentContainerStyle={styles.modalScroll}>
+            <Image
+              source={{ uri: selectedRecipe.image }}
+              style={styles.modalImage}
+            />
 
-              <Text style={styles.sectionHeader}>Ingredients</Text>
-              {/* Prefer extendedIngredients if available, otherwise just show missing (fallback) */}
-              {(selectedRecipe.extendedIngredients && selectedRecipe.extendedIngredients.length > 0) ? (
-                selectedRecipe.extendedIngredients.map((ing, idx) => (
-                  <Text key={idx} style={styles.ingredientItem}>• {ing}</Text>
-                ))
-              ) : (
-                selectedRecipe.missedIngredients.map((ing, idx) => (
-                  <Text key={idx} style={styles.ingredientItem}>• {ing}</Text>
-                ))
-              )}
+            <Text style={styles.modalTitle}>
+              {selectedRecipe.title}
+            </Text>
 
-              <Text style={styles.sectionHeader}>Instructions</Text>
-              {selectedRecipe.analyzedInstructions.length > 0 ? (
-                selectedRecipe.analyzedInstructions[0].steps.map((step, idx) => (
+            <Text style={styles.modalSubtitle}>
+              Ready in {selectedRecipe.readyInMinutes} mins | Servings:{' '}
+              {selectedRecipe.servings}
+            </Text>
+
+            <Text style={styles.sectionHeader}>Ingredients</Text>
+
+            {selectedRecipe.extendedIngredients &&
+            selectedRecipe.extendedIngredients.length > 0
+              ? selectedRecipe.extendedIngredients.map(
+                  (ing: any, idx: number) => (
+                    <Text key={idx} style={styles.ingredientItem}>
+                      • {ing.original}
+                    </Text>
+                  )
+                )
+              : selectedRecipe.missedIngredients.map(
+                  (ing: any, idx: number) => (
+                    <Text key={idx} style={styles.ingredientItem}>
+                      • {ing.original}
+                    </Text>
+                  )
+                )}
+
+            <Text style={styles.sectionHeader}>Instructions</Text>
+
+            {selectedRecipe.analyzedInstructions.length > 0 ? (
+              selectedRecipe.analyzedInstructions[0].steps.map(
+                (step, idx) => (
                   <View key={idx} style={styles.stepContainer}>
-                    <Text style={styles.stepNumber}>{step.step}</Text>
+                    <Text style={styles.stepNumber}>
+                      {idx + 1}. {step.step}
+                    </Text>
                   </View>
-                ))
-              ) : (
-                <Text style={styles.message}>No instructions available.</Text>
-              )}
+                )
+              )
+            ) : (
+              <Text style={styles.message}>
+                No instructions available.
+              </Text>
+            )}
 
-              <Button title="Close" onPress={() => setSelectedRecipe(null)} />
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
+            <Button
+              title="Close"
+              onPress={() => setSelectedRecipe(null)}
+            />
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
 
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+    <StatusBar style="auto" />
+  </View>
+);}
 
 const styles = StyleSheet.create({
   container: {
@@ -258,10 +437,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardTitle: {
+    flex: 1,
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
-    flexWrap: 'wrap',
+    marginBottom: 8,
   },
   cardInfo: {
     fontSize: 14,

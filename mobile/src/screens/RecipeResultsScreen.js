@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,48 +7,107 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
-import { addFavorite, removeFavorite, getFavorites } from '../services/api';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-const RecipeResultsScreen = ({ route, navigation }) => {
-  const { recipes } = route.params;
+import { addFavorite, removeFavorite, getRecipeDetail } from '../services/api';
 
+const RecipeResultsScreen = ({ route, navigation }) => {
+
+  const { recipes } = route.params;
   const [favoriteIds, setFavoriteIds] = useState([]);
 
-  // Load favorites when screen is mounted
-  useEffect(() => {
-    loadFavorites();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+    }, [])
+  );
 
-  // Fetch favorite recipes from backend
   const loadFavorites = async () => {
     try {
-      const data = await getFavorites();
-      const ids = data.map((f) => f.recipe_id);
+
+      const latest = await AsyncStorage.getItem('favorites');
+      const favorites = latest ? JSON.parse(latest) : [];
+
+      const ids = favorites.map((f) =>
+        Number(f.id || f.recipe_id)
+      );
+
       setFavoriteIds(ids);
+
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Toggle favorite state for a recipe
   const handleFavorite = async (recipe) => {
+
     try {
-      if (favoriteIds.includes(recipe.id)) {
-        await removeFavorite(recipe.id);
-        setFavoriteIds(favoriteIds.filter((id) => id !== recipe.id));
+
+      const latest = await AsyncStorage.getItem('favorites');
+      let favorites = latest ? JSON.parse(latest) : [];
+
+      const isFavorite = favorites.some(
+        (f) => Number(f.id || f.recipe_id) === Number(recipe.id)
+      );
+
+      if (isFavorite) {
+
+        try {
+          await removeFavorite(recipe.id);
+        } catch (err) {
+          console.log('Offline remove');
+        }
+
+        favorites = favorites.filter(
+          (f) => Number(f.id || f.recipe_id) !== Number(recipe.id)
+        );
+
+        await AsyncStorage.setItem(
+          'favorites',
+          JSON.stringify(favorites)
+        );
+
+        setFavoriteIds((prev) =>
+          prev.filter((id) => id !== recipe.id)
+        );
+
       } else {
-        await addFavorite(recipe);
-        setFavoriteIds([...favoriteIds, recipe.id]);
+
+        const fullRecipe = await getRecipeDetail(recipe.id);
+
+        try {
+          await addFavorite(fullRecipe);
+        } catch (err) {
+          console.log('Offline add');
+        }
+
+        const exists = favorites.some(
+          (f) => Number(f.id || f.recipe_id) === Number(fullRecipe.id)
+        );
+
+        if (!exists) {
+          favorites.push(fullRecipe);
+        }
+
+        await AsyncStorage.setItem(
+          'favorites',
+          JSON.stringify(favorites)
+        );
+
+        setFavoriteIds((prev) => [...prev, recipe.id]);
+
       }
+
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Render each recipe card
   const renderRecipe = ({ item }) => {
-    // Count how many ingredients you have / miss
+
     const availableCount =
       item.availableCount ??
       (item.availableIngredients?.length || 0);
@@ -58,60 +117,89 @@ const RecipeResultsScreen = ({ route, navigation }) => {
       (item.missingIngredients?.length || 0);
 
     const totalIngredients =
-      item.totalIngredients ?? availableCount + missingCount;
+      item.totalIngredients ??
+      availableCount + missingCount;
 
-    // Percentage of ingredients you already have
     const percent =
-      totalIngredients > 0 ? (availableCount / totalIngredients) * 100 : 0;
+      totalIngredients > 0
+        ? (availableCount / totalIngredients) * 100
+        : 0;
 
-    // Change bar color based on match percentage
     const barColor =
       percent >= 70
-        ? '#27ae60' // green – good match
+        ? '#27ae60'
         : percent >= 40
-        ? '#f39c12' // orange – medium match
-        : '#e74c3c'; // red – low match
+        ? '#f39c12'
+        : '#e74c3c';
 
     return (
+
       <TouchableOpacity
         style={styles.recipeCard}
         activeOpacity={0.9}
-        onPress={() => navigation.navigate('CookRecipe', { recipe: item })}
+        onPress={() =>
+          navigation.navigate('CookRecipe', { recipe: item })
+        }
       >
-        {/* Image wrapper (for recipe thumbnail + heart button) */}
-        <View style={styles.imageWrapper}>
-          <Image source={{ uri: item.image }} style={styles.recipeImage} />
 
-          {/* Favorite (heart) button */}
+        {/* Image + heart */}
+        <View style={styles.imageWrapper}>
+
+          <Image
+            source={{ uri: item.image }}
+            style={styles.recipeImage}
+          />
+
+          {/* Favorite button */}
           <TouchableOpacity
             style={styles.heartButton}
             onPress={(e) => {
-              e.stopPropagation(); // prevent card press
+              e.stopPropagation();
               handleFavorite(item);
             }}
           >
+
             <Ionicons
-              name={favoriteIds.includes(item.id) ? 'heart' : 'heart-outline'}
+              name={
+                favoriteIds.includes(item.id)
+                  ? 'heart'
+                  : 'heart-outline'
+              }
               size={22}
               color="#ef4444"
             />
+
           </TouchableOpacity>
+
         </View>
 
-        {/* Text + meta info */}
+        {/* Recipe info */}
         <View style={styles.recipeInfo}>
-          <Text style={styles.recipeName}>{item.title}</Text>
+
+          <Text style={styles.recipeName}>
+            {item.title}
+          </Text>
 
           <View style={styles.metaContainer}>
-            <Text style={styles.metaText}>⏱️ {item.readyInMinutes} min</Text>
-            <Text style={styles.metaText}>🍽️ {item.servings} servings</Text>
+
+            <Text style={styles.metaText}>
+              ⏱️ {item.readyInMinutes} min
+            </Text>
+
+            <Text style={styles.metaText}>
+              🍽️ {item.servings} servings
+            </Text>
+
           </View>
 
-          {/* Pantry match progress + missing info */}
+          {/* Pantry match */}
           {totalIngredients > 0 && (
+
             <View style={styles.ingredientsStatus}>
+
               {/* Progress bar */}
               <View style={styles.statusBar}>
+
                 <View
                   style={[
                     styles.statusBarFill,
@@ -121,6 +209,7 @@ const RecipeResultsScreen = ({ route, navigation }) => {
                     },
                   ]}
                 />
+
               </View>
 
               <Text style={styles.statusText}>
@@ -128,26 +217,39 @@ const RecipeResultsScreen = ({ route, navigation }) => {
               </Text>
 
               {missingCount > 0 && (
+
                 <View style={styles.missingBadge}>
+
                   <Text style={styles.missingText}>
                     Missing: {missingCount} ingredients
                   </Text>
+
                 </View>
+
               )}
+
             </View>
+
           )}
+
         </View>
+
       </TouchableOpacity>
+
     );
   };
 
   return (
+
     <View style={styles.container}>
-      {/* Header showing how many recipes were found */}
+
+      {/* Header */}
       <View style={styles.header}>
+
         <Text style={styles.headerText}>
           Found {recipes.length} recipe{recipes.length !== 1 ? 's' : ''} for you!
         </Text>
+
       </View>
 
       {/* Recipe list */}
@@ -157,29 +259,36 @@ const RecipeResultsScreen = ({ route, navigation }) => {
         renderItem={renderRecipe}
         contentContainerStyle={styles.listContent}
       />
+
     </View>
+
   );
 };
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+
   header: {
     backgroundColor: 'white',
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
+
   headerText: {
     fontSize: 18,
     color: '#2c3e50',
     fontWeight: '600',
   },
+
   listContent: {
     padding: 15,
   },
+
   recipeCard: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -191,14 +300,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+
   imageWrapper: {
     position: 'relative',
   },
+
   recipeImage: {
     width: '100%',
     height: 200,
     backgroundColor: '#e0e0e0',
   },
+
   heartButton: {
     position: 'absolute',
     top: 12,
@@ -206,33 +318,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 6,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
+
   recipeInfo: {
     padding: 15,
   },
+
   recipeName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 10,
   },
+
   metaContainer: {
     flexDirection: 'row',
     gap: 15,
     marginBottom: 10,
   },
+
   metaText: {
     fontSize: 14,
     color: '#666',
   },
+
   ingredientsStatus: {
     marginTop: 10,
   },
+
   statusBar: {
     height: 8,
     backgroundColor: '#e0e0e0',
@@ -240,14 +353,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 5,
   },
+
   statusBarFill: {
     height: '100%',
-    backgroundColor: '#27ae60',
   },
+
   statusText: {
     fontSize: 13,
     color: '#666',
   },
+
   missingBadge: {
     backgroundColor: '#fff3cd',
     paddingVertical: 10,
@@ -257,11 +372,13 @@ const styles = StyleSheet.create({
     borderLeftWidth: 5,
     borderLeftColor: '#f1c40f',
   },
+
   missingText: {
     color: '#856404',
     fontSize: 13,
     fontWeight: '600',
   },
+
 });
 
 export default RecipeResultsScreen;

@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useState, useMemo } from 'react';
 import {
     ActivityIndicator,
@@ -24,7 +25,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
     const [message, setMessage] = useState("");
 
     const heading = useMemo(() => {
-        return mode === "login" ? "Welcome Back!" : "Create Account";
+        return mode === "login" ? "Welcome!" : "Create Account";
     }, [mode]);
 
     const resetAuthState = () => {
@@ -117,6 +118,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 return;
             }
 
+            await AsyncStorage.setItem("token", data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(data.user));
             onLoginSuccess(data.token, data.user);
         } catch (submitError) {
             setError(submitError.message || "Something went wrong.");
@@ -241,7 +244,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1
+        flex: 1,
+        backgroundColor: "#5a7559"
     },
     scrollContent: {
         flexGrow: 1,
@@ -265,11 +269,11 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 18,
-        color: "#cbd5e1",
+        color: "#dfe7df",
         fontWeight: "500"
     },
     card: {
-        backgroundColor: "#1e293b",
+        backgroundColor: "#f4f7f4",
         borderRadius: 24,
         padding: 24,
         shadowColor: "#000",
@@ -284,45 +288,45 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: "600",
-        color: "#e2e8f0",
+        color: "#2f3e2f",
         marginBottom: 8
     },
     input: {
         borderWidth: 2,
-        borderColor: "#334155",
+        borderColor: "#9fb79e",
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 16,
-        backgroundColor: "#0f172a",
-        color: "#ffffff"
+        backgroundColor: "#ffffff",
+        color: "#2c3e2c"
     },
     passwordHints: {
-        backgroundColor: "#0f172a",
+        backgroundColor: "#eef5ee",
         padding: 12,
         borderRadius: 8,
         marginTop: 8,
         borderLeftWidth: 3,
-        borderLeftColor: "#3b82f6"
+        borderLeftColor: "#5a7559"
     },
     hintTitle: {
-        color: "#e2e8f0",
+        color: "#2f3e2f",
         fontSize: 13,
         fontWeight: "600",
         marginBottom: 6
     },
     hintText: {
-        color: "#94a3b8",
+        color: "#556b55",
         fontSize: 12,
         marginBottom: 2
     },
     button: {
-        backgroundColor: "#3b82f6",
+        backgroundColor: "#5a7559",
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: "center",
         marginTop: 8,
-        shadowColor: "#3b82f6",
+        shadowColor: "#5a7559",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -342,11 +346,11 @@ const styles = StyleSheet.create({
         alignItems: "center"
     },
     switchText: {
-        color: "#cbd5e1",
+        color: "#5a7559",
         fontSize: 14
     },
     switchTextBold: {
-        color: "#3b82f6",
+        color: "#5a7559",
         fontWeight: "700"
     },
     errorContainer: {

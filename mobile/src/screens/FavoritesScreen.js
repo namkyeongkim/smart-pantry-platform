@@ -9,24 +9,54 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getFavorites, removeFavorite } from '../services/api';
+import { getFavorites, removeFavorite, getRecipeDetail } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FavoritesScreen = ({ navigation }) => {
   const [favorites, setFavorites] = useState([]);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     loadFavorites();
   }, []);
 
+  // Load favorites (online first, fallback to offline)
   const loadFavorites = async () => {
     try {
       const data = await getFavorites();
-      setFavorites(data);
+
+      const detailedFavorites = await Promise.all(
+        data.map(async (fav) => {
+          const detail = await getRecipeDetail(fav.recipe_id);
+          return detail;
+        })
+      );
+
+      setFavorites(detailedFavorites);
+      setOffline(false);
+
+      // Save favorites offline
+      await AsyncStorage.setItem(
+        'favorites',
+        JSON.stringify(detailedFavorites)
+      );
+
     } catch (err) {
-      console.error('Failed to load favorites:', err);
+
+      console.log('Offline mode');
+      setOffline(true);
+
+      const data = await AsyncStorage.getItem('favorites');
+
+      if (data) {
+        setFavorites(JSON.parse(data));
+      } else {
+        setFavorites([]);
+      }
     }
   };
 
+  // Remove favorite
   const handleRemove = (recipeId) => {
     Alert.alert(
       "Remove Favorite",
@@ -37,14 +67,27 @@ const FavoritesScreen = ({ navigation }) => {
           text: "Remove",
           style: "destructive",
           onPress: async () => {
+
             try {
               await removeFavorite(recipeId);
-              setFavorites(prev =>
-                prev.filter(f => f.recipe_id !== recipeId)
-              );
             } catch (err) {
-              console.error(err);
+              Alert.alert(
+                "Offline Mode",
+                "You cannot remove favorites while offline."
+              );
+              return;
             }
+
+            const updatedFavorites = favorites.filter(
+              f => (f.recipe_id || f.id) !== recipeId
+            );
+
+            setFavorites(updatedFavorites);
+
+            await AsyncStorage.setItem(
+              'favorites',
+              JSON.stringify(updatedFavorites)
+            );
           }
         }
       ]
@@ -55,13 +98,18 @@ const FavoritesScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>My Favorite Recipes</Text>
 
+      {offline && (
+        <Text style={styles.offlineText}>
+          Offline mode
+        </Text>
+      )}
+
       <FlatList
         data={favorites}
-        keyExtractor={(item) => item.recipe_id.toString()}
+        keyExtractor={(item) => (item.recipe_id || item.id).toString()}
         renderItem={({ item }) => (
           <View style={styles.card}>
 
-            {/* Navigate to Recipe Detail */}
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() =>
@@ -75,15 +123,16 @@ const FavoritesScreen = ({ navigation }) => {
               <Text style={styles.recipeTitle}>{item.title}</Text>
             </TouchableOpacity>
 
-            {/* Bottom Right Delete Button */}
-            <View style={styles.bottomRow}>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleRemove(item.recipe_id)}
-              >
-                <Ionicons name="trash-outline" size={18} color="#ef4444" />
-              </TouchableOpacity>
-            </View>
+            {!offline && (
+              <View style={styles.bottomRow}>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleRemove(item.recipe_id || item.id)}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            )}
 
           </View>
         )}
@@ -112,6 +161,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     color: '#2c3e50',
+  },
+
+  offlineText: {
+    color: '#999',
+    marginBottom: 10,
   },
 
   card: {

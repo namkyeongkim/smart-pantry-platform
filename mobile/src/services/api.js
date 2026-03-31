@@ -1,12 +1,21 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
 let authToken = null;
 
 // Set token when user logs in
-export const setAuthToken = (token) => {
+export const setAuthToken = async (token) => {
   authToken = token;
+  await AsyncStorage.setItem('token', token);
+};
+
+export const loadToken = async () => {
+  const token = await AsyncStorage.getItem('token');
+  if (token) {
+    authToken = token;
+  }
 };
 
 // Create axios instance
@@ -33,8 +42,8 @@ export const getPantryItems = async () => {
     const response = await api.get('/api/pantry');
     return response.data;
   } catch (error) {
-    console.error('Error getting pantry items:', error);
-    throw error;
+    console.log('Offline mode: pantry unavailable');
+    return [];
   }
 };
 
@@ -74,8 +83,8 @@ export const searchRecipes = async (preferences) => {
     const response = await api.post('/api/recipes/search', preferences);
     return response.data;
   } catch (error) {
-    console.error('Error searching recipes:', error);
-    throw error;
+    console.log('Offline mode: recipe search unavailable');
+    throw new Error('OFFLINE');
   }
 };
 
