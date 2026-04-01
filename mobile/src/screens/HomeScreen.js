@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { getPantryItems, deletePantryItem, updatePantryQuantity } from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
@@ -250,7 +251,7 @@ const HomeScreen = ({ navigation }) => {
                         style={styles.deleteButton}
                         onPress={() => openDeleteModal(item)}
                       >
-                        <Text style={styles.deleteIcon}>✕</Text>
+                        <Ionicons name="trash-outline" size={18} color="#dc2626" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -399,42 +400,6 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Categories Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-
-          <View style={styles.categoryGrid}>
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🌶️</Text>
-              <Text style={styles.categoryText}>Spices</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥫</Text>
-              <Text style={styles.categoryText}>Canned</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🍯</Text>
-              <Text style={styles.categoryText}>Condiments</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥬</Text>
-              <Text style={styles.categoryText}>Vegetables</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥕</Text>
-              <Text style={styles.categoryText}>Produce</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥩</Text>
-              <Text style={styles.categoryText}>Meat</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -448,44 +413,48 @@ const HomeScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Remove {currentItem?.name}</Text>
+            <Text style={styles.modalTitle}>
+              Remove {currentItem?.name?.charAt(0).toUpperCase()}{currentItem?.name?.slice(1)}
+            </Text>
             <Text style={styles.modalSubtitle}>
               Available: {currentItem?.quantity} {currentItem?.unit}
             </Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>How much to remove?</Text>
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>How much to remove?</Text>
               <TextInput
-                style={styles.quantityInput}
+                style={styles.modalInput}
                 value={deleteQuantity}
                 onChangeText={setDeleteQuantity}
                 keyboardType="numeric"
-                placeholder="Enter quantity"
+                placeholder={`Enter amount in ${currentItem?.unit || 'units'}`}
+                placeholderTextColor="#999"
+                autoFocus={true}
               />
             </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setDeleteModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.removeButton]}
+                style={[styles.modalButton, styles.modalRemoveButton]}
                 onPress={handleDeleteQuantity}
               >
-                <Text style={styles.removeButtonText}>Remove</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.deleteAllButton]}
-                onPress={handleDeleteAll}
-              >
-                <Text style={styles.deleteAllButtonText}>Delete All</Text>
+                <Text style={styles.modalRemoveText}>Remove</Text>
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={styles.modalDeleteAllButton}
+              onPress={handleDeleteAll}
+            >
+              <Text style={styles.modalDeleteAllText}>Delete All</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -726,33 +695,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600'
   },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10
-  },
-  categoryButton: {
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  categoryEmoji: {
-    fontSize: 18,
-    marginRight: 6
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#3d4a3e',
-    fontWeight: '500'
-  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -770,25 +713,25 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#3d4a3e',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: 15,
     color: '#7a8b7c',
-    marginBottom: 24,
+    marginBottom: 20,
     textAlign: 'center',
   },
-  inputContainer: {
-    marginBottom: 24,
+  modalInputContainer: {
+    marginBottom: 20,
   },
-  inputLabel: {
+  modalInputLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#3d4a3e',
     marginBottom: 8,
   },
-  quantityInput: {
+  modalInput: {
     borderWidth: 2,
     borderColor: '#e0dcd7',
     borderRadius: 12,
@@ -796,38 +739,43 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#f5f3f0',
+    color: '#3d4a3e',
   },
   modalButtons: {
-    gap: 10,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
   },
   modalButton: {
+    flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f5f3f0',
+  modalCancelButton: {
+    backgroundColor: '#f0ede8',
   },
-  cancelButtonText: {
-    color: '#3d4a3e',
+  modalCancelText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#7a8b7c',
   },
-  removeButton: {
-    backgroundColor: '#fbbf24',
+  modalRemoveButton: {
+    backgroundColor: '#5a7559',
   },
-  removeButtonText: {
+  modalRemoveText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
-  deleteAllButton: {
-    backgroundColor: '#ef4444',
+  modalDeleteAllButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
   },
-  deleteAllButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  modalDeleteAllText: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#e74c3c',
   },
   recentCard:{
     backgroundColor:'#fff',

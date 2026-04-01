@@ -77,6 +77,17 @@ export const updatePantryQuantity = async (id, quantity) => {
   }
 };
 
+// Ingredient suggestions for autocomplete
+export const getIngredientSuggestions = async () => {
+  try {
+    const response = await api.get('/api/pantry/ingredients');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting ingredient suggestions:', error);
+    return [];
+  }
+};
+
 // Recipe API calls
 export const searchRecipes = async (preferences) => {
   try {
