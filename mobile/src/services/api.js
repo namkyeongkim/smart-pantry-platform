@@ -157,4 +157,33 @@ export const getRecipeDetail = async (id) => {
   return response.data;
 };
 
+// ================= Shopping List =================
+export const getShoppingList = async () => {
+  const response = await api.get('/api/shopping-list');
+  return response.data;
+};
+
+export const addShoppingListItem = async (item) => {
+  const response = await api.post('/api/shopping-list', item);
+  return response.data;
+};
+
+export const addMissingIngredientsToShoppingList = async (recipeId, missingIngredients) => {
+  const response = await api.post('/api/shopping-list/from-recipe', {
+    recipeId,
+    missingIngredients,
+  });
+  return response.data;
+};
+
+export const updateShoppingListItem = async (id, checked) => {
+  const response = await api.patch(`/api/shopping-list/${id}`, { checked });
+  return response.data;
+};
+
+export const deleteShoppingListItem = async (id) => {
+  const response = await api.delete(`/api/shopping-list/${id}`);
+  return response.data;
+};
+
 export default api;

@@ -16,6 +16,7 @@ import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import EditIngredientsScreen from '../screens/EditIngredientsScreen';
 import EditInstructionsScreen from '../screens/EditInstructionsScreen';
 import CookingHistoryScreen from '../screens/CookingHistoryScreen';
+import ShoppingListScreen from '../screens/ShoppingListScreen';
 
 const Stack = createStackNavigator();
 
@@ -80,7 +81,7 @@ const AppNavigator = ({ token, user, onLogout }) => {
           name="Home"
           component={HomeScreen}
           options={({ navigation }) => ({
-            header: () => <HomeHeader navigation={navigation} />
+            header: () => <HomeHeader navigation={navigation} />,
           })}
         />
 
@@ -163,6 +164,12 @@ const AppNavigator = ({ token, user, onLogout }) => {
         <Stack.Screen
           name="CookingHistory"
           component={CookingHistoryScreen}
+        />
+
+        <Stack.Screen
+          name="ShoppingList"
+          component={ShoppingListScreen}
+          options={{ title: 'Shopping List' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -18,6 +18,7 @@ const pantryRoutes = require('./routes/pantry');
 const recipeRoutes = require('./routes/recipes');
 const favoritesRoutes = require('./routes/favorites');
 const adminRoutes = require('./routes/admin');
+const shoppingListRoutes = require('./routes/shoppingList');
 
 // Use Routes
 app.use('/api/users', userRoutes);
@@ -25,6 +26,8 @@ app.use('/api/pantry', pantryRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/admin', adminRoutes);
+app.use('/api/shopping-list', shoppingListRoutes);
+
 
 // Test Route
 app.get('/', (req, res) => {
