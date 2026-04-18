@@ -13,7 +13,8 @@ import {
     ScrollView
 } from 'react-native';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:5000";
+const rawApiBaseUrl = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:3000";
+const API_BASE_URL = rawApiBaseUrl.startsWith('//') ? rawApiBaseUrl.slice(2) : rawApiBaseUrl;
 
 const LoginScreen = ({ onLoginSuccess }) => {
     const [mode, setMode] = useState("login");
