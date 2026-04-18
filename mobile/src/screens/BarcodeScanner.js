@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Camera, CameraView } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, FlatList, Modal } from 'react-native';
+import { getPantryItems, associateUPCWithPantryItem } from '../services/api';
 
 export default function BarcodeScanner({ navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
@@ -10,6 +11,9 @@ export default function BarcodeScanner({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isScanning, setIsScanning] = useState(true);
+  const [showPantryModal, setShowPantryModal] = useState(false);
+  const [pantryItems, setPantryItems] = useState([]);
+  const [loadingPantry, setLoadingPantry] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -70,6 +74,39 @@ export default function BarcodeScanner({ navigation }) {
     setTimeout(() => {
       lookupProduct();
     }, 500);
+  };
+
+  const openPantrySelection = async () => {
+    setLoadingPantry(true);
+    setShowPantryModal(true);
+    try {
+      const items = await getPantryItems();
+      setPantryItems(items);
+    } catch (_error) {
+      console.log('Could not load pantry items');
+      setPantryItems([]);
+    } finally {
+      setLoadingPantry(false);
+    }
+  };
+
+  const selectPantryItem = async (pantryItem) => {
+    try {
+      setLoading(true);
+      await associateUPCWithPantryItem(pantryItem.id, scannedCode);
+      setProduct({
+        name: pantryItem.name,
+        code: scannedCode,
+        fromPantry: true,
+      });
+      setError('');
+      setShowPantryModal(false);
+    } catch (error) {
+      console.error('Error associating UPC:', error);
+      setError('Failed to associate UPC with pantry item');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -136,17 +173,68 @@ export default function BarcodeScanner({ navigation }) {
           ) : error ? (
             <View style={styles.resultCard}>
               <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.pantryButton}
+                onPress={openPantrySelection}
+              >
+                <Text style={styles.pantryButtonText}>Pick from Pantry</Text>
+              </TouchableOpacity>
             </View>
           ) : product ? (
             <View style={styles.resultCard}>
               <Text style={styles.productName}>{product.name}</Text>
-              {product.brand ? <Text style={styles.productBrand}>{product.brand}</Text> : null}
+              {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
               <Text style={styles.productCode}>UPC: {product.code}</Text>
+              {product.fromPantry && <Text style={styles.pantryNote}>Associated from your pantry</Text>}
             </View>
           ) : null}
         </>
       )}
       <StatusBar style="light" />
+
+      <Modal
+        visible={showPantryModal}
+        animationType="slide"
+        onRequestClose={() => setShowPantryModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Pantry Item</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowPantryModal(false)}
+            >
+              <Text style={styles.closeText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loadingPantry ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#5a7559" />
+              <Text style={styles.loadingText}>Loading pantry...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={pantryItems}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.pantryItem}
+                  onPress={() => selectPantryItem(item)}
+                >
+                  <Text style={styles.pantryItemName}>{item.name}</Text>
+                  <Text style={styles.pantryItemQuantity}>
+                    {item.quantity} {item.unit}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>No items in pantry</Text>
+              }
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -292,5 +380,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  pantryNote: {
+    fontSize: 12,
+    color: '#5a7559',
+    textAlign: 'center',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  pantryButton: {
+    backgroundColor: '#5a7559',
+    padding: 12,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  pantryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#5a7559',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pantryItem: {
+    backgroundColor: '#fff',
+    padding: 15,
+    marginHorizontal: 20,
+    marginVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  pantryItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pantryItemQuantity: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#666',
+    marginTop: 50,
   },
 });

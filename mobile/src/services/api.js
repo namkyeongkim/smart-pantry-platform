@@ -78,6 +78,16 @@ export const updatePantryQuantity = async (id, quantity) => {
   }
 };
 
+export const associateUPCWithPantryItem = async (pantryItemId, upc) => {
+  try {
+    const response = await api.patch(`/api/pantry/${pantryItemId}/upc`, { upc });
+    return response.data;
+  } catch (error) {
+    console.error('Error associating UPC with pantry item:', error);
+    throw error;
+  }
+};
+
 // Recipe API calls
 export const searchRecipes = async (preferences) => {
   try {
