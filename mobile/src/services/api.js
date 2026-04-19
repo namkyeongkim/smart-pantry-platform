@@ -1,7 +1,27 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+const getDevBaseUrl = () => {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.hostUri;
+
+  if (!hostUri) return null;
+
+  const host = hostUri.split(':')[0];
+  return host ? `http://${host}:3000` : null;
+};
+
+const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+const normalizedEnvApiUrl = envApiUrl?.startsWith('//') ? envApiUrl.slice(2) : envApiUrl;
+const devBaseUrl = getDevBaseUrl();
+
+export const API_URL =
+  normalizedEnvApiUrl && !normalizedEnvApiUrl.includes('ngrok-free.dev')
+    ? normalizedEnvApiUrl
+    : normalizedEnvApiUrl || devBaseUrl || 'http://10.0.2.2:3000';
 
 let authToken = null;
 
@@ -73,6 +93,16 @@ export const updatePantryQuantity = async (id, quantity) => {
     return response.data;
   } catch (error) {
     console.error('Error updating pantry quantity:', error);
+    throw error;
+  }
+};
+
+export const associateUPCWithPantryItem = async (pantryItemId, upc) => {
+  try {
+    const response = await api.patch(`/api/pantry/${pantryItemId}/upc`, { upc });
+    return response.data;
+  } catch (error) {
+    console.error('Error associating UPC with pantry item:', error);
     throw error;
   }
 };

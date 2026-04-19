@@ -12,8 +12,7 @@ import {
     View,
     ScrollView
 } from 'react-native';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:5000";
+import { API_URL } from '../services/api';
 
 const LoginScreen = ({ onLoginSuccess }) => {
     const [mode, setMode] = useState("login");
@@ -96,7 +95,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
                     ? { email: email.trim(), password }
                     : { username: username.trim(), email: email.trim(), password };
 
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            const response = await fetch(`${API_URL}${endpoint}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
