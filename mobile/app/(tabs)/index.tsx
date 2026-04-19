@@ -220,7 +220,7 @@ export default function HomeScreen() {
       <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
-    </View>
+      <TouchableOpacity
         onPress={() => {
           setIsFavoriteView(true);
           loadFavorites();
