@@ -1,6 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button, ActivityIndicator, ScrollView, TextInput, Image, TouchableOpacity, Modal, Platform } from 'react-native';
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../auth-context';
 
 // ==============================================================================
 // TEAM SETUP INSTRUCTION:
@@ -9,7 +11,8 @@ import { useState } from 'react';
 // 3. Replace the IP address below with YOUR computer's IP.
 // ==============================================================================
 // using ngrok for stable remote access
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+const BASE_URL = rawBaseUrl.startsWith('//') ? rawBaseUrl.slice(2) : rawBaseUrl;
 const API_URL = `${BASE_URL}/api/recipes/search-mood`;
 
 interface Ingredient {
@@ -44,6 +47,8 @@ interface RecommendationResponse {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { logout, user, token } = useAuth();
   const [mood, setMood] = useState('');
   const [servings, setServings] = useState('2');
   const [loading, setLoading] = useState(false);
@@ -66,6 +71,7 @@ export default function HomeScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
           'Bypass-Tunnel-Reminder': 'true',
         },
         body: JSON.stringify({
@@ -104,7 +110,10 @@ export default function HomeScreen() {
     try {
       await fetch(`${BASE_URL}/api/favorites`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           userId: 1,
           recipeId: recipe.id,
@@ -125,7 +134,11 @@ export default function HomeScreen() {
   // Load saved favorite recipes from the backend
   const loadFavorites = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/favorites/1`);
+      const res = await fetch(`${BASE_URL}/api/favorites/1`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
       const formatted = data.map((item: any) => ({
         id: item.recipe_id,
@@ -152,7 +165,10 @@ export default function HomeScreen() {
    const removeFromFavorites = async (recipe: Recipe) => {
     try {
       await fetch(`${BASE_URL}/api/favorites/${recipe.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       setFavoriteIds(prev => prev.filter(id => id !== recipe.id));
       
@@ -168,7 +184,12 @@ export default function HomeScreen() {
   const openRecipeDetails = async (recipe: Recipe) => {
     try {
       const res = await fetch(
-        `${BASE_URL}/api/recipes/details/${recipe.id}`
+        `${BASE_URL}/api/recipes/details/${recipe.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
       );
       
       const data = await res.json();
@@ -179,6 +200,11 @@ export default function HomeScreen() {
     }
   };
   
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
 
   return (
   <View style={styles.container}>
@@ -191,7 +217,9 @@ export default function HomeScreen() {
       }}
     >
       <Text style={styles.title}>Pantry Pal 🥣</Text>
-
+      <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={() => {
           setIsFavoriteView(true);
@@ -213,36 +241,50 @@ export default function HomeScreen() {
     )}
 
     {!isFavoriteView && (
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>What are you in the mood for?</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., Pasta, Spicy, Vegan"
-          value={mood}
-          onChangeText={setMood}
-        />
+      <>
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={() => router.push('barcode')}
+        >
+          <Text style={styles.scanButtonText}>Scan UPC</Text>
+        </TouchableOpacity>
 
-        <Text style={styles.label}>How many people?</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="2"
-          value={servings}
-          onChangeText={setServings}
-          keyboardType="numeric"
-        />
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>What are you in the mood for?</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., Pasta, Spicy, Vegan"
+            value={mood}
+            onChangeText={setMood}
+          />
 
-        <Button
-          title="Find Recipes"
-          onPress={handleFindDinner}
-          disabled={loading}
-        />
-      </View>
+          <Text style={styles.label}>How many people?</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="2"
+            value={servings}
+            onChangeText={setServings}
+            keyboardType="numeric"
+          />
+
+          <Button
+            title="Find Recipes"
+            onPress={handleFindDinner}
+            disabled={loading}
+          />
+        </View>
+      </>
     )}
 
     {loading && (
       <ActivityIndicator size="large" color="#0000ff" style={{ marginTop: 20 }} />
     )}
 
+    {!BASE_URL && (
+      <Text style={styles.error}>
+        EXPO_PUBLIC_API_URL is not configured correctly. Set it in mobile/.env and restart Expo.
+      </Text>
+    )}
     {error && <Text style={styles.error}>{error}</Text>}
 
     <ScrollView style={styles.resultContainer}>
@@ -405,6 +447,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: '#f9f9f9',
   },
+  scanButton: {
+    backgroundColor: '#5a7559',
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    marginBottom: 18,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  scanButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   error: {
     color: 'red',
     marginTop: 20,
@@ -499,5 +555,15 @@ const styles = StyleSheet.create({
   message: {
     fontStyle: 'italic',
     color: '#666',
+  },
+  logoutButton: {
+    padding: 8,
+    backgroundColor: '#5a7559',
+    borderRadius: 8,
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

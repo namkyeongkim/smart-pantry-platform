@@ -23,7 +23,8 @@ CREATE TABLE ingredients (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     category VARCHAR(50), -- e.g., 'Produce', 'Spices', 'Dairy'
-    default_unit VARCHAR(20) -- e.g., 'grams', 'cups', 'units'
+    default_unit VARCHAR(20), -- e.g., 'grams', 'cups', 'units'
+    upc VARCHAR(50) -- UPC barcode for product identification
 );
 
 CREATE TABLE pantry_items (

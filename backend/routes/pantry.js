@@ -216,4 +216,37 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Associate UPC with pantry item
+router.patch('/:id/upc', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { upc } = req.body;
+        const userId = req.user.id;
+        console.log('Associating UPC with pantry item:', id, upc);
+
+        // First get the ingredient_id from the pantry item
+        const pantryResult = await pool.query(
+            'SELECT ingredient_id FROM pantry_items WHERE id = $1 AND user_id = $2',
+            [id, userId]
+        );
+
+        if (pantryResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Pantry item not found' });
+        }
+
+        const ingredientId = pantryResult.rows[0].ingredient_id;
+
+        // Update the ingredient with the UPC
+        await pool.query(
+            'UPDATE ingredients SET upc = $1 WHERE id = $2',
+            [upc, ingredientId]
+        );
+
+        res.json({ message: 'UPC associated successfully' });
+    } catch (err) {
+        console.error('UPC association error:', err);
+        res.status(500).json({ error: 'Failed to associate UPC' });
+    }
+});
+
 module.exports = router;

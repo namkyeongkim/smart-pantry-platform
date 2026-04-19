@@ -334,6 +334,23 @@ const HomeScreen = ({ navigation }) => {
               </View>
             </TouchableOpacity>
 
+            {/* Scan UPC */}
+            <TouchableOpacity
+              style={styles.featureCard}
+              onPress={() => navigation.navigate('BarcodeScanner')}
+            >
+              <View style={styles.featureIcon}>
+                <Text style={styles.featureEmoji}>📷</Text>
+              </View>
+
+              <Text style={styles.featureTitle}>Scan UPC</Text>
+
+              <View style={styles.featureButton}>
+                <Text style={styles.featureButtonText}>Open Camera</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Search Recipes */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('RecipeSearch')}

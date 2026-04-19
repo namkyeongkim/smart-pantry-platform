@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, SafeAreaView, StyleSheet, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView, StyleSheet, Alert } from "react-native";
 
@@ -8,12 +9,13 @@ import LoginScreen from "./src/screens/LoginScreen";
 import { setAuthToken, setAuthExpiredHandler } from "./src/services/api";
 
 export default function App() {
-  const [token, setToken] = useState("");
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Check if a saved token exists (auto login)
   useEffect(() => {
-    const checkLogin = async () => {
+    const restoreSession = async () => {
       try {
         const savedToken = await AsyncStorage.getItem("token");
         const savedUser = await AsyncStorage.getItem("user");
@@ -27,9 +29,17 @@ export default function App() {
         // Restore user info
         if (savedUser) {
           setUser(JSON.parse(savedUser));
+        const storedToken = await AsyncStorage.getItem("token");
+        const storedUser = await AsyncStorage.getItem("user");
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+          await setAuthToken(storedToken);
         }
       } catch (error) {
-        console.log("Error loading saved login:", error);
+        console.error("Error restoring session:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -49,11 +59,13 @@ export default function App() {
         console.log("Error clearing expired session:", error);
       }
     });
+    restoreSession();
   }, []);
 
-  const handleLoginSuccess = (newToken, newUser) => {
-    setToken(newToken || "");
-    setUser(newUser || null);
+  const handleLoginSuccess = async (newToken, newUser) => {
+    setToken(newToken);
+    setUser(newUser);
+    await setAuthToken(newToken);
   };
 
   const handleLogout = async () => {
@@ -80,9 +92,23 @@ export default function App() {
   }
 
   // If not logged in → show login screen
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
+  };
+
   return (
     <SafeAreaView style={styles.screen}>
-      <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      {loading ? (
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      ) : token ? (
+        <AppNavigator token={token} user={user} onLogout={handleLogout} />
+      ) : (
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      )}
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -92,5 +118,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#5a7559",
+  },
+  loader: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

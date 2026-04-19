@@ -17,6 +17,7 @@ import EditIngredientsScreen from '../screens/EditIngredientsScreen';
 import EditInstructionsScreen from '../screens/EditInstructionsScreen';
 import CookingHistoryScreen from '../screens/CookingHistoryScreen';
 import ShoppingListScreen from '../screens/ShoppingListScreen';
+import BarcodeScanner from '../screens/BarcodeScanner';
 
 const Stack = createStackNavigator();
 
@@ -170,6 +171,9 @@ const AppNavigator = ({ token, user, onLogout }) => {
           name="ShoppingList"
           component={ShoppingListScreen}
           options={{ title: 'Shopping List' }}
+          name="BarcodeScanner"
+          component={BarcodeScanner}
+          options={{ title: 'Scan UPC' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
