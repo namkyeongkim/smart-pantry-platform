@@ -329,6 +329,52 @@ router.post('/search', authenticateToken, async (req, res) => {
 /* =====================================================
    COOK RECIPE (deduct ingredients from pantry)
 ===================================================== */
+
+// Unit conversion factors to a common base (grams for weight, ml for volume)
+const UNIT_TO_GRAMS = {
+  'g': 1, 'gram': 1, 'grams': 1,
+  'kg': 1000, 'kilogram': 1000, 'kilograms': 1000,
+  'oz': 28.35, 'ounce': 28.35, 'ounces': 28.35,
+  'lb': 453.6, 'lbs': 453.6, 'pound': 453.6, 'pounds': 453.6,
+};
+
+const UNIT_TO_ML = {
+  'ml': 1, 'milliliter': 1, 'milliliters': 1,
+  'l': 1000, 'liter': 1000, 'liters': 1000,
+  'cup': 236.6, 'cups': 236.6,
+  'tbsp': 14.8, 'tablespoon': 14.8, 'tablespoons': 14.8,
+  'tsp': 4.9, 'teaspoon': 4.9, 'teaspoons': 4.9,
+  'fl oz': 29.6,
+};
+
+const COUNT_UNITS = ['pieces', 'piece', '', 'whole', 'large', 'medium', 'small', 'clove', 'cloves', 'head', 'heads', 'stalk', 'stalks', 'bunch', 'bunches', 'slice', 'slices', 'pinch', 'serving', 'servings'];
+
+function convertAmount(amount, fromUnit, toUnit) {
+  const from = (fromUnit || '').toLowerCase().trim();
+  const to = (toUnit || '').toLowerCase().trim();
+
+  // Same unit or no unit — just use the amount directly
+  if (from === to || !from || !to) return amount;
+
+  // Both are weight units
+  if (UNIT_TO_GRAMS[from] && UNIT_TO_GRAMS[to]) {
+    return (amount * UNIT_TO_GRAMS[from]) / UNIT_TO_GRAMS[to];
+  }
+
+  // Both are volume units
+  if (UNIT_TO_ML[from] && UNIT_TO_ML[to]) {
+    return (amount * UNIT_TO_ML[from]) / UNIT_TO_ML[to];
+  }
+
+  // Both are count-type units
+  if (COUNT_UNITS.includes(from) && COUNT_UNITS.includes(to)) {
+    return amount;
+  }
+
+  // Can't convert between different unit types — use the amount as-is
+  return amount;
+}
+
 router.post('/cook', authenticateToken, async (req, res) => {
   const { recipeId } = req.body;
   const userId = req.user.id;
@@ -366,6 +412,21 @@ router.post('/cook', authenticateToken, async (req, res) => {
 
     // 3. For each recipe ingredient, find matching pantry item and deduct
     for (const ing of ingredients) {
+      // Extract name and amount from ingredient
+      let ingName, ingAmount, ingUnit;
+
+      if (typeof ing === 'object') {
+        ingName = (ing.name || ing.original || '').toLowerCase().trim();
+        ingAmount = ing.amount || ing.quantity || 1;
+        ingUnit = (ing.unit || '').toLowerCase().trim();
+      } else {
+        ingName = normalize(typeof ing === 'string' ? ing : '');
+        ingAmount = 1;
+        ingUnit = '';
+      }
+
+      if (!ingName) continue;
+
       const words = splitWords(ing);
 
       // Find a matching pantry item
@@ -374,16 +435,20 @@ router.post('/cook', authenticateToken, async (req, res) => {
         return words.some(word =>
           pName === word ||
           pName === word.replace(/s$/, '') ||
-          word === pName.replace(/s$/, '')
+          word === pName.replace(/s$/, '') ||
+          pName.includes(word) ||
+          word.includes(pName)
         );
       });
 
       if (matchedPantry) {
-        // Deduct 1 unit (since recipe ingredients don't always have exact amounts mapped)
-        const newQty = Math.max(0, matchedPantry.quantity - 1);
+        // Convert recipe amount to pantry's unit
+        const deductAmount = convertAmount(ingAmount, ingUnit, matchedPantry.unit);
+        const newQty = Math.max(0, matchedPantry.quantity - deductAmount);
+
+        console.log(`Deducting ${deductAmount.toFixed(2)} ${matchedPantry.unit} of ${matchedPantry.name} (recipe: ${ingAmount} ${ingUnit})`);
 
         if (newQty <= 0) {
-          // Remove the item entirely
           await pool.query(
             'DELETE FROM pantry_items WHERE id = $1 AND user_id = $2',
             [matchedPantry.id, userId]
@@ -394,9 +459,9 @@ router.post('/cook', authenticateToken, async (req, res) => {
             `UPDATE pantry_items
              SET quantity = $1, updated_at = CURRENT_TIMESTAMP
              WHERE id = $2 AND user_id = $3`,
-            [newQty, matchedPantry.id, userId]
+            [parseFloat(newQty.toFixed(2)), matchedPantry.id, userId]
           );
-          updatedItems.push({ name: matchedPantry.name, newQuantity: newQty });
+          updatedItems.push({ name: matchedPantry.name, deducted: parseFloat(deductAmount.toFixed(2)), unit: matchedPantry.unit, newQuantity: parseFloat(newQty.toFixed(2)) });
         }
 
         // Update local copy so we don't double-deduct the same item

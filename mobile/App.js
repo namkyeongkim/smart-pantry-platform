@@ -2,19 +2,33 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, SafeAreaView, StyleSheet, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView, StyleSheet, Alert } from "react-native";
 
 import AppNavigator from "./src/navigation/AppNavigator";
 import LoginScreen from "./src/screens/LoginScreen";
-import { setAuthToken } from "./src/services/api";
+import { setAuthToken, setAuthExpiredHandler } from "./src/services/api";
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Check if a saved token exists (auto login)
   useEffect(() => {
     const restoreSession = async () => {
       try {
+        const savedToken = await AsyncStorage.getItem("token");
+        const savedUser = await AsyncStorage.getItem("user");
+
+        // Restore session if token exists
+        if (savedToken) {
+          await setAuthToken(savedToken);
+          setToken(savedToken);
+        }
+
+        // Restore user info
+        if (savedUser) {
+          setUser(JSON.parse(savedUser));
         const storedToken = await AsyncStorage.getItem("token");
         const storedUser = await AsyncStorage.getItem("user");
         if (storedToken && storedUser) {
@@ -29,6 +43,22 @@ export default function App() {
       }
     };
 
+    checkLogin();
+
+    // Handle token expiration globally
+    setAuthExpiredHandler(async () => {
+      try {
+        await AsyncStorage.removeItem("token");
+        await AsyncStorage.removeItem("user");
+
+        setToken("");
+        setUser(null);
+
+        Alert.alert("Session Expired", "Please log in again.");
+      } catch (error) {
+        console.log("Error clearing expired session:", error);
+      }
+    });
     restoreSession();
   }, []);
 
@@ -39,6 +69,29 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user");
+
+      await setAuthToken(null);
+      setToken("");
+      setUser(null);
+    } catch (error) {
+      console.log("Logout error:", error);
+    }
+  };
+
+  // If logged in → show main app
+  if (token) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <AppNavigator token={token} user={user} onLogout={handleLogout} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
+
+  // If not logged in → show login screen
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("user");
     setToken(null);

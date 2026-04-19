@@ -14,7 +14,13 @@ import {
 } from 'react-native';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getPantryItems, deletePantryItem, updatePantryQuantity } from '../services/api';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  getPantryItems,
+  deletePantryItem,
+  updatePantryQuantity,
+  getShoppingList,
+} from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
   const [pantryItems, setPantryItems] = useState([]);
@@ -26,31 +32,41 @@ const HomeScreen = ({ navigation }) => {
   const [currentItem, setCurrentItem] = useState(null);
   const [deleteQuantity, setDeleteQuantity] = useState('1');
   const [recentlyCooked, setRecentlyCooked] = useState([]);
+  const [shoppingListCount, setShoppingListCount] = useState(0);
 
   useEffect(() => {
     loadPantryItems();
     loadCookingHistory();
+    loadShoppingListCount();
   }, []);
 
   const loadCookingHistory = async () => {
-  try {
+    try {
+      const history = await AsyncStorage.getItem('cooking_history');
 
-    const history = await AsyncStorage.getItem('cooking_history');
-
-    if (history) {
-      const parsed = JSON.parse(history);
-
-      setRecentlyCooked(parsed.slice(0,3));
+      if (history) {
+        const parsed = JSON.parse(history);
+        setRecentlyCooked(parsed.slice(0, 3));
+      }
+    } catch (error) {
+      console.log('Failed to load cooking history', error);
     }
+  };
 
-  } catch (error) {
-    console.log('Failed to load cooking history', error);
-  }
-};
+  const loadShoppingListCount = async () => {
+    try {
+      const data = await getShoppingList();
+      setShoppingListCount(data.length);
+    } catch (error) {
+      console.log('Failed to load shopping list count', error);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadPantryItems();
+      loadCookingHistory();
+      loadShoppingListCount();
     });
     return unsubscribe;
   }, [navigation]);
@@ -70,6 +86,8 @@ const HomeScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadPantryItems();
+    await loadCookingHistory();
+    await loadShoppingListCount();
     setRefreshing(false);
   };
 
@@ -91,7 +109,6 @@ const HomeScreen = ({ navigation }) => {
     }
 
     if (qty >= currentItem.quantity) {
-      // Delete entire item
       try {
         await deletePantryItem(currentItem.id);
         setPantryItems(pantryItems.filter(item => item.id !== currentItem.id));
@@ -101,7 +118,6 @@ const HomeScreen = ({ navigation }) => {
         Alert.alert('Error', 'Failed to delete item');
       }
     } else {
-      // Decrease quantity — call backend
       try {
         await updatePantryQuantity(currentItem.id, currentItem.quantity - qty);
         setPantryItems(pantryItems.map(item =>
@@ -250,7 +266,7 @@ const HomeScreen = ({ navigation }) => {
                         style={styles.deleteButton}
                         onPress={() => openDeleteModal(item)}
                       >
-                        <Text style={styles.deleteIcon}>✕</Text>
+                        <Ionicons name="trash-outline" size={18} color="#dc2626" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -272,55 +288,32 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* Recently Cooked */}
-
         {recentlyCooked.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recently Cooked</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('CookingHistory')}
+              >
+                <Text style={styles.viewAllText}>View All →</Text>
+              </TouchableOpacity>
+            </View>
 
-        <View style={styles.section}>
-
-        <View style={styles.sectionHeader}>
-
-        <Text style={styles.sectionTitle}>
-        Recently Cooked
-        </Text>
-
-        <TouchableOpacity
-        onPress={() => navigation.navigate('CookingHistory')}
-        >
-
-        <Text style={styles.viewAllText}>
-        View All →
-        </Text>
-
-        </TouchableOpacity>
-
-        </View>
-
-        {recentlyCooked.map((item,index)=>(
-
-        <TouchableOpacity
-        key={index}
-        style={styles.recentCard}
-        onPress={() =>
-        navigation.navigate("RecipeDetail", {
-        recipe: item
-        })
-        }
-        >
-
-        <Text style={styles.recentTitle}>
-        🍳 {item.title}
-        </Text>
-
-        <Text style={styles.recentTime}>
-        ⏱ {item.readyInMinutes} min
-        </Text>
-
-        </TouchableOpacity>
-
-        ))}
-
-        </View>
-
+            {recentlyCooked.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.recentCard}
+                onPress={() =>
+                  navigation.navigate('RecipeDetail', {
+                    recipe: item
+                  })
+                }
+              >
+                <Text style={styles.recentTitle}>🍳 {item.title}</Text>
+                <Text style={styles.recentTime}>⏱ {item.readyInMinutes} min</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {/* Quick Actions Section */}
@@ -328,8 +321,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
 
           <View style={styles.featureGrid}>
-
-            {/* Manage Pantry */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('Pantry')}
@@ -337,9 +328,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>🗄️</Text>
               </View>
-
               <Text style={styles.featureTitle}>Manage Pantry</Text>
-
               <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>Go to Pantry</Text>
               </View>
@@ -369,16 +358,12 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>🔍</Text>
               </View>
-
               <Text style={styles.featureTitle}>Search Recipes</Text>
-
               <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>Find Recipes</Text>
               </View>
             </TouchableOpacity>
 
-
-            {/* Favorites */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('Favorites')}
@@ -386,16 +371,12 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>❤️</Text>
               </View>
-
               <Text style={styles.featureTitle}>Favorites</Text>
-
               <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>View Favorites</Text>
               </View>
             </TouchableOpacity>
 
-
-            {/* Cooking History */}
             <TouchableOpacity
               style={styles.featureCard}
               onPress={() => navigation.navigate('CookingHistory')}
@@ -403,56 +384,31 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.featureIcon}>
                 <Text style={styles.featureEmoji}>🍳</Text>
               </View>
-
               <Text style={styles.featureTitle}>Cooking History</Text>
-
               <View style={styles.featureButton}>
                 <Text style={styles.featureButtonText}>View History</Text>
               </View>
             </TouchableOpacity>
-
           </View>
         </View>
 
-        {/* Categories Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-
-          <View style={styles.categoryGrid}>
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🌶️</Text>
-              <Text style={styles.categoryText}>Spices</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥫</Text>
-              <Text style={styles.categoryText}>Canned</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🍯</Text>
-              <Text style={styles.categoryText}>Condiments</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥬</Text>
-              <Text style={styles.categoryText}>Vegetables</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥕</Text>
-              <Text style={styles.categoryText}>Produce</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.categoryButton}>
-              <Text style={styles.categoryEmoji}>🥩</Text>
-              <Text style={styles.categoryText}>Meat</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Floating Shopping Cart Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('ShoppingList')}
+      >
+        <Ionicons name="cart" size={26} color="#fff" />
+        {shoppingListCount > 0 && (
+          <View style={styles.fabBadge}>
+            <Text style={styles.fabBadgeText}>
+              {shoppingListCount > 9 ? '9+' : shoppingListCount}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       {/* Delete Quantity Modal */}
       <Modal
@@ -463,44 +419,48 @@ const HomeScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Remove {currentItem?.name}</Text>
+            <Text style={styles.modalTitle}>
+              Remove {currentItem?.name?.charAt(0).toUpperCase()}{currentItem?.name?.slice(1)}
+            </Text>
             <Text style={styles.modalSubtitle}>
               Available: {currentItem?.quantity} {currentItem?.unit}
             </Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>How much to remove?</Text>
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>How much to remove?</Text>
               <TextInput
-                style={styles.quantityInput}
+                style={styles.modalInput}
                 value={deleteQuantity}
                 onChangeText={setDeleteQuantity}
                 keyboardType="numeric"
-                placeholder="Enter quantity"
+                placeholder={`Enter amount in ${currentItem?.unit || 'units'}`}
+                placeholderTextColor="#999"
+                autoFocus={true}
               />
             </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setDeleteModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.removeButton]}
+                style={[styles.modalButton, styles.modalRemoveButton]}
                 onPress={handleDeleteQuantity}
               >
-                <Text style={styles.removeButtonText}>Remove</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.deleteAllButton]}
-                onPress={handleDeleteAll}
-              >
-                <Text style={styles.deleteAllButtonText}>Delete All</Text>
+                <Text style={styles.modalRemoveText}>Remove</Text>
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={styles.modalDeleteAllButton}
+              onPress={handleDeleteAll}
+            >
+              <Text style={styles.modalDeleteAllText}>Delete All</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -682,11 +642,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 8,
   },
-  deleteIcon: {
-    fontSize: 24,
-    color: '#dc2626',
-    fontWeight: '400',
-  },
   viewAllButton: {
     marginTop: 16,
     alignItems: 'center',
@@ -702,7 +657,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between'
   },
-
   featureCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -741,32 +695,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600'
   },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10
-  },
-  categoryButton: {
-    backgroundColor: '#fff',
-    flexDirection: 'row',
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#5a7559',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  categoryEmoji: {
-    fontSize: 18,
-    marginRight: 6
+  fabBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
-  categoryText: {
-    fontSize: 14,
-    color: '#3d4a3e',
-    fontWeight: '500'
+  fabBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
@@ -785,25 +745,25 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#3d4a3e',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: 15,
     color: '#7a8b7c',
-    marginBottom: 24,
+    marginBottom: 20,
     textAlign: 'center',
   },
-  inputContainer: {
-    marginBottom: 24,
+  modalInputContainer: {
+    marginBottom: 20,
   },
-  inputLabel: {
+  modalInputLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#3d4a3e',
     marginBottom: 8,
   },
-  quantityInput: {
+  modalInput: {
     borderWidth: 2,
     borderColor: '#e0dcd7',
     borderRadius: 12,
@@ -811,62 +771,65 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#f5f3f0',
+    color: '#3d4a3e',
   },
   modalButtons: {
-    gap: 10,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
   },
   modalButton: {
+    flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f5f3f0',
+  modalCancelButton: {
+    backgroundColor: '#f0ede8',
   },
-  cancelButtonText: {
-    color: '#3d4a3e',
+  modalCancelText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#7a8b7c',
   },
-  removeButton: {
-    backgroundColor: '#fbbf24',
+  modalRemoveButton: {
+    backgroundColor: '#5a7559',
   },
-  removeButtonText: {
+  modalRemoveText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#fff',
+  },
+  modalDeleteAllButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalDeleteAllText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e74c3c',
+  },
+  recentCard: {
+    backgroundColor: '#fff',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2
+  },
+  recentTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#3d4a3e'
   },
-  deleteAllButton: {
-    backgroundColor: '#ef4444',
+  recentTime: {
+    fontSize: 13,
+    color: '#7a8b7c',
+    marginTop: 4
   },
-  deleteAllButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  recentCard:{
-    backgroundColor:'#fff',
-    padding:14,
-    borderRadius:10,
-    marginBottom:10,
-    shadowColor:'#000',
-    shadowOffset:{width:0,height:1},
-    shadowOpacity:0.05,
-    shadowRadius:3,
-    elevation:2
-    },
-
-    recentTitle:{
-    fontSize:16,
-    fontWeight:'600',
-    color:'#3d4a3e'
-    },
-
-    recentTime:{
-    fontSize:13,
-    color:'#7a8b7c',
-    marginTop:4
-    },
 });
 
 export default HomeScreen;

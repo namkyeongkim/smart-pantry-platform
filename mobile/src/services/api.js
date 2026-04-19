@@ -23,19 +23,42 @@ export const API_URL =
     ? normalizedEnvApiUrl
     : normalizedEnvApiUrl || devBaseUrl || 'http://10.0.2.2:3000';
 
+// Store JWT token in memory
 let authToken = null;
 
-// Set token when user logs in
-export const setAuthToken = async (token) => {
-  authToken = token;
-  await AsyncStorage.setItem('token', token);
+// Callback function to handle token expiration globally
+let authExpiredHandler = null;
+
+// Register a handler to be called when token expires
+export const setAuthExpiredHandler = (handler) => {
+  authExpiredHandler = handler;
 };
 
+// Save token after login
+export const setAuthToken = async (token) => {
+  authToken = token;
+
+  if (token) {
+    await AsyncStorage.setItem('token', token);
+  } else {
+    await AsyncStorage.removeItem('token');
+  }
+};
+
+// Load token from storage on app start (auto login)
 export const loadToken = async () => {
   const token = await AsyncStorage.getItem('token');
   if (token) {
     authToken = token;
   }
+  return token;
+};
+
+// Clear token and user data (logout or expired session)
+export const clearAuthToken = async () => {
+  authToken = null;
+  await AsyncStorage.removeItem('token');
+  await AsyncStorage.removeItem('user');
 };
 
 // Create axios instance
@@ -48,7 +71,7 @@ const api = axios.create({
   },
 });
 
-// Add token to every request
+// Attach JWT token to every request automatically
 api.interceptors.request.use((config) => {
   if (authToken) {
     config.headers.Authorization = `Bearer ${authToken}`;
@@ -56,7 +79,32 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Pantry API calls
+// Handle expired or invalid token globally
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error.response?.status;
+    const message = error.response?.data?.error;
+
+    const isExpired =
+      status === 401 ||
+      status === 403 ||
+      message === 'Invalid or expired token.';
+
+    if (isExpired) {
+      console.log('Session expired. Logging out...');
+      await clearAuthToken();
+
+      if (authExpiredHandler) {
+        authExpiredHandler();
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// ================= Pantry =================
 export const getPantryItems = async () => {
   try {
     const response = await api.get('/api/pantry');
@@ -68,35 +116,21 @@ export const getPantryItems = async () => {
 };
 
 export const addPantryItem = async (item) => {
-  try {
-    const response = await api.post('/api/pantry', item);
-    return response.data;
-  } catch (error) {
-    console.error('Error adding pantry item:', error);
-    throw error;
-  }
+  const response = await api.post('/api/pantry', item);
+  return response.data;
 };
 
 export const deletePantryItem = async (id) => {
-  try {
-    const response = await api.delete(`/api/pantry/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error deleting pantry item:', error);
-    throw error;
-  }
+  const response = await api.delete(`/api/pantry/${id}`);
+  return response.data;
 };
 
 export const updatePantryQuantity = async (id, quantity) => {
-  try {
-    const response = await api.patch(`/api/pantry/${id}`, { quantity });
-    return response.data;
-  } catch (error) {
-    console.error('Error updating pantry quantity:', error);
-    throw error;
-  }
+  const response = await api.patch(`/api/pantry/${id}`, { quantity });
+  return response.data;
 };
 
+// ================= Recipes =================
 export const associateUPCWithPantryItem = async (pantryItemId, upc) => {
   try {
     const response = await api.patch(`/api/pantry/${pantryItemId}/upc`, { upc });
@@ -109,47 +143,27 @@ export const associateUPCWithPantryItem = async (pantryItemId, upc) => {
 
 // Recipe API calls
 export const searchRecipes = async (preferences) => {
-  try {
-    const response = await api.post('/api/recipes/search', preferences);
-    return response.data;
-  } catch (error) {
-    console.log('Offline mode: recipe search unavailable');
-    throw new Error('OFFLINE');
-  }
+  const response = await api.post('/api/recipes/search', preferences);
+  return response.data;
 };
 
 export const cookRecipe = async (recipeId) => {
-  try {
-    const response = await api.post('/api/recipes/cook', { recipeId });
-    return response.data;
-  } catch (error) {
-    console.error('Error cooking recipe:', error);
-    throw error;
-  }
+  const response = await api.post('/api/recipes/cook', { recipeId });
+  return response.data;
 };
 
-// User Preferences API calls
+// ================= User =================
 export const getUserPreferences = async () => {
-  try {
-    const response = await api.get('/api/users/preferences');
-    return response.data;
-  } catch (error) {
-    console.error('Error getting preferences:', error);
-    throw error;
-  }
+  const response = await api.get('/api/users/preferences');
+  return response.data;
 };
 
 export const updateUserPreferences = async (flags) => {
-  try {
-    const response = await api.put('/api/users/preferences', { flags });
-    return response.data;
-  } catch (error) {
-    console.error('Error updating preferences:', error);
-    throw error;
-  }
+  const response = await api.put('/api/users/preferences', { flags });
+  return response.data;
 };
 
-// Favorites API calls
+// ================= Favorites =================
 export const addFavorite = async (recipe) => {
   const response = await api.post('/api/favorites', {
     recipe_id: recipe.id,
@@ -169,9 +183,37 @@ export const getFavorites = async () => {
   return response.data;
 };
 
-// Get full recipe details
 export const getRecipeDetail = async (id) => {
   const response = await api.get(`/api/recipes/${id}`);
+  return response.data;
+};
+
+// ================= Shopping List =================
+export const getShoppingList = async () => {
+  const response = await api.get('/api/shopping-list');
+  return response.data;
+};
+
+export const addShoppingListItem = async (item) => {
+  const response = await api.post('/api/shopping-list', item);
+  return response.data;
+};
+
+export const addMissingIngredientsToShoppingList = async (recipeId, missingIngredients) => {
+  const response = await api.post('/api/shopping-list/from-recipe', {
+    recipeId,
+    missingIngredients,
+  });
+  return response.data;
+};
+
+export const updateShoppingListItem = async (id, checked) => {
+  const response = await api.patch(`/api/shopping-list/${id}`, { checked });
+  return response.data;
+};
+
+export const deleteShoppingListItem = async (id) => {
+  const response = await api.delete(`/api/shopping-list/${id}`);
   return response.data;
 };
 

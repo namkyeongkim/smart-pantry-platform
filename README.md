@@ -6,10 +6,12 @@ A smart pantry tracking system that updates inventory based on cooking habits ra
 - **Dietary Profiles**: Set permanent restrictions (Vegan, GF, Allergies).
 - **Smart Recommendations**: Find recipes based on cravings + current inventory.
 - **Auto-Deduction**: Cooking a meal automatically updates pantry stock.
-- **Analytics**: Track consumption and reduce waste.
+- **Analytics**: Track recipe popularity, monitor pantry usage, and identify low-stock items.
+- **Admin Dashboard**: Monitor users, recipe activity, pantry inventory, and system-wide analytics through a web interface.
 
 ## Tech Stack
 - **Frontend (Native Mobile)**: React Native (Expo)
+- **Frontend (Web Admin Dashboard)**: React (Vite)
 - **Backend**: Node.js / Express
 - **Database**: PostgreSQL (Neon)
 
@@ -20,6 +22,7 @@ A smart pantry tracking system that updates inventory based on cooking habits ra
 
 ### Project Structure
 - `mobile/`: Frontend native mobile app (Expo React Native)
+- `admin-dashboard/`: Web-based admin dashboard (React + Vite)
 - `backend/`: Backend Node/Express API
 - `database/`: Database scripts
 
@@ -38,7 +41,7 @@ If setting up a new database, run the SQL in `database/init.sql` against your Ne
    - Development: `npm run dev`
    - Production: `npm start`
 5. **Exposing the Backend (ngrok)**:
-   - To connect your physical phone to the backend, use `ngrok`:
+   - To connect your physical phone or admin dashboard remotely to the backend, use `ngrok`:
      ```bash
      ngrok http 3000
      ```
@@ -60,4 +63,32 @@ The native app is in `mobile/` and includes login/register, pantry management, a
    - Install the **Expo Go** app on your physical phone (iOS/Android).
    - Use your phone's camera (iOS) or the Expo Go scan feature (Android) to scan the **QR Code** displayed in your terminal.
    - The app will load on your phone and connect to your backend via the ngrok tunnel.
+
+#### 4. Admin Dashboard (Web)
+The admin dashboard is in `admin-dashboard/` and provides a web interface for monitoring system activity and analytics.
+
+**Included Dashboard Features**
+- View total users, recipes, pantry items, and favorites
+- Track popular recipes
+- Monitor low-stock pantry items
+- View user activity and pantry overview
+- Access analytics charts through a separate admin page
+
+1. Navigate to the admin dashboard directory: `cd admin-dashboard`
+2. Install dependencies: `npm install`
+3. Create a `.env` file and set `VITE_API_URL`:
+   - For local backend:
+     ```env
+     VITE_API_URL=http://localhost:3000
+     ```
+   - Or use your **ngrok URL**:
+     ```env
+     VITE_API_URL=https://random-id.ngrok-free.app
+     ```
+4. Start the admin dashboard:
+   ```bash
+   npm run dev
+   ```
+5. Open in your browser:
+   http://localhost:5173
 

@@ -74,3 +74,15 @@ CREATE TABLE cooking_history (
     recipe_title VARCHAR(200),     -- Recipe name for display
     cooked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Shopping List 
+CREATE TABLE shopping_list_items (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipe_id BIGINT,
+    ingredient_name VARCHAR(255) NOT NULL,
+    quantity NUMERIC,
+    unit VARCHAR(50),
+    checked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
