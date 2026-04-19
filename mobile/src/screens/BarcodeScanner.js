@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Camera, CameraView } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, FlatList, Modal } from 'react-native';
-import { getPantryItems, associateUPCWithPantryItem } from '../services/api';
+import { Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, FlatList, Modal, Alert } from 'react-native';
+import { getPantryItems, associateUPCWithPantryItem, addPantryItem } from '../services/api';
 
 export default function BarcodeScanner({ navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
@@ -110,6 +110,24 @@ export default function BarcodeScanner({ navigation }) {
     }
   };
 
+  const addScannedToPantry = async () => {
+    if (!product?.name) return;
+    try {
+      setLoading(true);
+      await addPantryItem({
+        name: product.name,
+        quantity: 1,
+        unit: 'pieces',
+      });
+      Alert.alert('Added', 'Item added to pantry.');
+    } catch (error) {
+      console.error('Error adding scanned item:', error);
+      Alert.alert('Error', 'Failed to add item to pantry.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
@@ -187,6 +205,14 @@ export default function BarcodeScanner({ navigation }) {
               {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
               <Text style={styles.productCode}>UPC: {product.code}</Text>
               {product.fromPantry && <Text style={styles.pantryNote}>Associated from your pantry</Text>}
+              {!product.fromPantry && (
+                <TouchableOpacity
+                  style={styles.pantryButton}
+                  onPress={addScannedToPantry}
+                >
+                  <Text style={styles.pantryButtonText}>Add to Pantry</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : null}
         </>
