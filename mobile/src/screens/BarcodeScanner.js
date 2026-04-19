@@ -29,8 +29,9 @@ export default function BarcodeScanner({ navigation }) {
     requestPermission();
   }, []);
 
-  const lookupProduct = async () => {
-    if (!scannedCode.trim()) {
+  const lookupProduct = async (codeOverride) => {
+    const codeToLookup = (codeOverride ?? scannedCode).trim();
+    if (!codeToLookup) {
       setError('Please scan a barcode or try again.');
       return;
     }
@@ -40,14 +41,14 @@ export default function BarcodeScanner({ navigation }) {
     setProduct(null);
 
     try {
-      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${scannedCode.trim()}.json`);
+      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${codeToLookup}.json`);
       const result = await response.json();
 
       if (result.status === 1 && result.product) {
         setProduct({
           name: result.product.product_name || result.product.generic_name || 'Unknown product',
           brand: result.product.brands,
-          code: scannedCode,
+          code: codeToLookup,
         });
         setIsScanning(false);
       } else {
@@ -72,7 +73,7 @@ export default function BarcodeScanner({ navigation }) {
     setIsScanning(false);
     // Auto-lookup after detection
     setTimeout(() => {
-      lookupProduct();
+      lookupProduct(detectedCode);
     }, 500);
   };
 

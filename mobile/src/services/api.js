@@ -1,8 +1,27 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const rawApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
-const API_URL = rawApiUrl.startsWith('//') ? rawApiUrl.slice(2) : rawApiUrl;
+const getDevBaseUrl = () => {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.hostUri;
+
+  if (!hostUri) return null;
+
+  const host = hostUri.split(':')[0];
+  return host ? `http://${host}:3000` : null;
+};
+
+const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+const normalizedEnvApiUrl = envApiUrl?.startsWith('//') ? envApiUrl.slice(2) : envApiUrl;
+const devBaseUrl = getDevBaseUrl();
+
+export const API_URL =
+  normalizedEnvApiUrl && !normalizedEnvApiUrl.includes('ngrok-free.dev')
+    ? normalizedEnvApiUrl
+    : normalizedEnvApiUrl || devBaseUrl || 'http://10.0.2.2:3000';
 
 let authToken = null;
 
