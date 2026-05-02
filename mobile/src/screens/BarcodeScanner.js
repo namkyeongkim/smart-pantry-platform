@@ -1,8 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, CameraView } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, FlatList, Modal, Alert } from 'react-native';
-import { getPantryItems, associateUPCWithPantryItem, addPantryItem } from '../services/api';
+import {
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Alert,
+} from 'react-native';
+import {
+  getPantryItems,
+  associateUPCWithPantryItem,
+  addPantryItem,
+} from '../services/api';
 
 export default function BarcodeScanner({ navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
@@ -14,6 +29,8 @@ export default function BarcodeScanner({ navigation }) {
   const [showPantryModal, setShowPantryModal] = useState(false);
   const [pantryItems, setPantryItems] = useState([]);
   const [loadingPantry, setLoadingPantry] = useState(false);
+
+  const scanLockRef = useRef(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -31,8 +48,11 @@ export default function BarcodeScanner({ navigation }) {
 
   const lookupProduct = async (codeOverride) => {
     const codeToLookup = (codeOverride ?? scannedCode).trim();
+
     if (!codeToLookup) {
       setError('Please scan a barcode or try again.');
+      scanLockRef.current = false;
+      setIsScanning(true);
       return;
     }
 
@@ -41,23 +61,44 @@ export default function BarcodeScanner({ navigation }) {
     setProduct(null);
 
     try {
-      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${codeToLookup}.json`);
-      const result = await response.json();
+      const response = await fetch(
+        `https://world.openfoodfacts.org/api/v0/product/${codeToLookup}.json`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const text = await response.text();
+      console.log('OpenFoodFacts response:', text.slice(0, 200));
+
+      if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
+        throw new Error('OpenFoodFacts returned non-JSON response');
+      }
+
+      const result = JSON.parse(text);
 
       if (result.status === 1 && result.product) {
         setProduct({
-          name: result.product.product_name || result.product.generic_name || 'Unknown product',
+          name:
+            result.product.product_name ||
+            result.product.generic_name ||
+            'Unknown product',
           brand: result.product.brands,
           code: codeToLookup,
         });
+
         setIsScanning(false);
       } else {
         setError('Product not found. Try scanning another barcode.');
+        scanLockRef.current = false;
         setIsScanning(true);
       }
     } catch (err) {
+      console.error('Barcode lookup error:', err);
       setError('Could not lookup barcode. Check connection and try again.');
-      console.error(err);
+      scanLockRef.current = false;
       setIsScanning(true);
     } finally {
       setLoading(false);
@@ -65,21 +106,22 @@ export default function BarcodeScanner({ navigation }) {
   };
 
   const handleBarcodeScanned = (result) => {
-    if (!isScanning) return;
+    if (scanLockRef.current || !isScanning || loading) return;
+
+    scanLockRef.current = true;
 
     const detectedCode = result.data;
     console.log('Barcode scanned:', detectedCode);
+
     setScannedCode(detectedCode);
     setIsScanning(false);
-    // Auto-lookup after detection
-    setTimeout(() => {
-      lookupProduct(detectedCode);
-    }, 500);
+    lookupProduct(detectedCode);
   };
 
   const openPantrySelection = async () => {
     setLoadingPantry(true);
     setShowPantryModal(true);
+
     try {
       const items = await getPantryItems();
       setPantryItems(items);
@@ -94,12 +136,15 @@ export default function BarcodeScanner({ navigation }) {
   const selectPantryItem = async (pantryItem) => {
     try {
       setLoading(true);
+
       await associateUPCWithPantryItem(pantryItem.id, scannedCode);
+
       setProduct({
         name: pantryItem.name,
         code: scannedCode,
         fromPantry: true,
       });
+
       setError('');
       setShowPantryModal(false);
     } catch (error) {
@@ -112,13 +157,16 @@ export default function BarcodeScanner({ navigation }) {
 
   const addScannedToPantry = async () => {
     if (!product?.name) return;
+
     try {
       setLoading(true);
+
       await addPantryItem({
         name: product.name,
         quantity: 1,
         unit: 'pieces',
       });
+
       Alert.alert('Added', 'Item added to pantry.');
     } catch (error) {
       console.error('Error adding scanned item:', error);
@@ -128,11 +176,23 @@ export default function BarcodeScanner({ navigation }) {
     }
   };
 
+  const resetScanner = () => {
+    scanLockRef.current = false;
+    setScannedCode('');
+    setProduct(null);
+    setError('');
+    setIsScanning(true);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Scan UPC</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
+
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.closeText}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -154,12 +214,13 @@ export default function BarcodeScanner({ navigation }) {
           <View style={styles.cameraContainer}>
             <CameraView
               style={styles.camera}
-              facing={'back'}
+              facing="back"
               onBarcodeScanned={isScanning ? handleBarcodeScanned : undefined}
               barcodeScannerSettings={{
                 barcodeTypes: ['upc_a', 'upc_e', 'ean8', 'ean13'],
               }}
             />
+
             <View style={styles.barcodeGuide}>
               <View style={styles.guideBorder} />
               <Text style={styles.guideText}>Position barcode in frame</Text>
@@ -170,15 +231,8 @@ export default function BarcodeScanner({ navigation }) {
             <View style={styles.scannedInfo}>
               <Text style={styles.scannedLabel}>Detected Code:</Text>
               <Text style={styles.scannedCode}>{scannedCode}</Text>
-              <TouchableOpacity
-                style={styles.rescanButton}
-                onPress={() => {
-                  setScannedCode('');
-                  setProduct(null);
-                  setError('');
-                  setIsScanning(true);
-                }}
-              >
+
+              <TouchableOpacity style={styles.rescanButton} onPress={resetScanner}>
                 <Text style={styles.rescanText}>Scan Another</Text>
               </TouchableOpacity>
             </View>
@@ -192,6 +246,7 @@ export default function BarcodeScanner({ navigation }) {
           ) : error ? (
             <View style={styles.resultCard}>
               <Text style={styles.errorText}>{error}</Text>
+
               <TouchableOpacity
                 style={styles.pantryButton}
                 onPress={openPantrySelection}
@@ -202,9 +257,19 @@ export default function BarcodeScanner({ navigation }) {
           ) : product ? (
             <View style={styles.resultCard}>
               <Text style={styles.productName}>{product.name}</Text>
-              {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
+
+              {product.brand && (
+                <Text style={styles.productBrand}>{product.brand}</Text>
+              )}
+
               <Text style={styles.productCode}>UPC: {product.code}</Text>
-              {product.fromPantry && <Text style={styles.pantryNote}>Associated from your pantry</Text>}
+
+              {product.fromPantry && (
+                <Text style={styles.pantryNote}>
+                  Associated from your pantry
+                </Text>
+              )}
+
               {!product.fromPantry && (
                 <TouchableOpacity
                   style={styles.pantryButton}
@@ -217,6 +282,7 @@ export default function BarcodeScanner({ navigation }) {
           ) : null}
         </>
       )}
+
       <StatusBar style="light" />
 
       <Modal
@@ -227,6 +293,7 @@ export default function BarcodeScanner({ navigation }) {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Pantry Item</Text>
+
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowPantryModal(false)}
