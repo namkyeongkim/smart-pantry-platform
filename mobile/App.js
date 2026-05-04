@@ -1,12 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  View,
-  Alert,
-} from "react-native";
+import { ActivityIndicator, SafeAreaView, StyleSheet, View, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import AppNavigator from "./src/navigation/AppNavigator";
@@ -18,20 +12,18 @@ export default function App() {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore saved login session when app starts
+  // Check if a saved token exists (auto login)
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const storedToken = await AsyncStorage.getItem("token");
-        const storedUser = await AsyncStorage.getItem("user");
+        const savedToken = await AsyncStorage.getItem("token");
+        const savedUser = await AsyncStorage.getItem("user");
 
-        if (storedToken) {
-          await setAuthToken(storedToken);
-          setToken(storedToken);
-        }
-
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+        // Restore session if token exists
+        if (savedToken && savedUser) {
+          await setAuthToken(savedToken);
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
         }
       } catch (error) {
         console.error("Error restoring session:", error);
@@ -42,14 +34,13 @@ export default function App() {
 
     restoreSession();
 
-    // Auto logout when JWT expires
+    // Handle token expiration globally
     setAuthExpiredHandler(async () => {
       try {
         await AsyncStorage.removeItem("token");
         await AsyncStorage.removeItem("user");
-        await setAuthToken(null);
 
-        setToken(null);
+        setToken("");
         setUser(null);
 
         Alert.alert("Session Expired", "Please log in again.");
@@ -59,21 +50,19 @@ export default function App() {
     });
   }, []);
 
-  // Called after successful login
   const handleLoginSuccess = async (newToken, newUser) => {
     setToken(newToken);
     setUser(newUser);
     await setAuthToken(newToken);
   };
 
-  // Manual logout
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem("token");
       await AsyncStorage.removeItem("user");
-      await setAuthToken(null);
 
-      setToken(null);
+      await setAuthToken(null);
+      setToken("");
       setUser(null);
     } catch (error) {
       console.log("Logout error:", error);

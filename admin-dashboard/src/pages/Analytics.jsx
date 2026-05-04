@@ -20,7 +20,7 @@ function Analytics() {
     fetchGrowth();
   }, []);
 
-  const fetchTopRecipes = async () => {
+  async function fetchTopRecipes() {
     try {
       const res = await api.get('/admin/recipes/top');
       setTopRecipes(res.data);
@@ -29,7 +29,7 @@ function Analytics() {
     }
   };
 
-  const fetchGrowth = async () => {
+  async function fetchGrowth() {
     try {
       const res = await api.get('/admin/growth');
 

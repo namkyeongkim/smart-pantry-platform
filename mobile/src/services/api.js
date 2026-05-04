@@ -2,9 +2,6 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-// ================= Base URL Configuration =================
-
-// Get local development URL (Expo device → local backend)
 const getDevBaseUrl = () => {
   const hostUri =
     Constants.expoConfig?.hostUri ||
@@ -18,24 +15,21 @@ const getDevBaseUrl = () => {
 };
 
 const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
-const normalizedEnvApiUrl = envApiUrl?.startsWith('//')
-  ? envApiUrl.slice(2)
-  : envApiUrl;
-
+const normalizedEnvApiUrl = envApiUrl?.startsWith('//') ? envApiUrl.slice(2) : envApiUrl;
 const devBaseUrl = getDevBaseUrl();
 
-// Priority: ENV → dev → emulator fallback
 export const API_URL =
   normalizedEnvApiUrl && !normalizedEnvApiUrl.includes('ngrok-free.dev')
     ? normalizedEnvApiUrl
     : normalizedEnvApiUrl || devBaseUrl || 'http://10.0.2.2:3000';
 
-// ================= Auth State =================
-
+// Store JWT token in memory
 let authToken = null;
+
+// Callback function to handle token expiration globally
 let authExpiredHandler = null;
 
-// Register handler for expired session
+// Register a handler to be called when token expires
 export const setAuthExpiredHandler = (handler) => {
   authExpiredHandler = handler;
 };
@@ -51,22 +45,23 @@ export const setAuthToken = async (token) => {
   }
 };
 
-// Load token from storage (auto-login)
+// Load token from storage on app start (auto login)
 export const loadToken = async () => {
   const token = await AsyncStorage.getItem('token');
-  if (token) authToken = token;
+  if (token) {
+    authToken = token;
+  }
   return token;
 };
 
-// Clear token on logout or expiration
+// Clear token and user data (logout or expired session)
 export const clearAuthToken = async () => {
   authToken = null;
   await AsyncStorage.removeItem('token');
   await AsyncStorage.removeItem('user');
 };
 
-// ================= Axios Instance =================
-
+// Create axios instance
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
@@ -76,7 +71,7 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token to every request
+// Attach JWT token to every request automatically
 api.interceptors.request.use((config) => {
   if (authToken) {
     config.headers.Authorization = `Bearer ${authToken}`;
@@ -84,7 +79,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle expired token globally
+// Handle expired or invalid token globally
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -109,12 +104,10 @@ api.interceptors.response.use(
   }
 );
 
-// ================= Pantry APIs =================
-
-// Get all pantry items for the logged-in user
-export const getPantryItems = async () => {
+// ================= Pantry =================
+export const getPantryItems = async (isShared = false) => {
   try {
-    const response = await api.get('/api/pantry');
+    const response = await api.get(`/api/pantry?shared=${isShared}`);
     return response.data;
   } catch (error) {
     console.log('Offline mode: pantry unavailable');
@@ -122,74 +115,81 @@ export const getPantryItems = async () => {
   }
 };
 
-// Fetch ingredient suggestions for autocomplete
+export const addPantryItem = async (item, isShared = false) => {
+  const response = await api.post(`/api/pantry?shared=${isShared}`, item);
+  return response.data;
+};
+
+export const deletePantryItem = async (id, isShared = false) => {
+  const response = await api.delete(`/api/pantry/${id}?shared=${isShared}`);
+  return response.data;
+};
+
+export const updatePantryQuantity = async (id, quantity, isShared = false) => {
+  const response = await api.patch(`/api/pantry/${id}?shared=${isShared}`, { quantity });
+  return response.data;
+};
+
 export const getIngredientSuggestions = async () => {
   const response = await api.get('/api/pantry/ingredients');
   return response.data;
 };
 
-// Add new item to pantry
-export const addPantryItem = async (item) => {
-  const response = await api.post('/api/pantry', item);
+// ================= Shared Pantry =================
+export const getActiveSharedPantry = async () => {
+  const response = await api.get('/api/shared-pantry');
   return response.data;
 };
 
-// Delete pantry item
-export const deletePantryItem = async (id) => {
-  const response = await api.delete(`/api/pantry/${id}`);
+export const createSharedPantry = async (name) => {
+  const response = await api.post('/api/shared-pantry', { name });
   return response.data;
 };
 
-// Update pantry item quantity
-export const updatePantryQuantity = async (id, quantity) => {
-  const response = await api.patch(`/api/pantry/${id}`, { quantity });
+export const joinSharedPantry = async (code) => {
+  const response = await api.post('/api/shared-pantry/join', { code });
   return response.data;
 };
 
-// Associate UPC code with an existing pantry item
-// ⚠️ Requires backend route: PATCH /api/pantry/:id/upc
-export const associateUPCWithPantryItem = async (pantryItemId, upc) => {
-  const response = await api.patch(`/api/pantry/${pantryItemId}/upc`, { upc });
+export const leaveSharedPantry = async () => {
+  const response = await api.post('/api/shared-pantry/leave');
   return response.data;
 };
 
-// ================= Recipe APIs =================
+// ================= Recipes =================
+export const associateUPCWithPantryItem = async (pantryItemId, upc, isShared = false) => {
+  try {
+    const response = await api.patch(`/api/pantry/${pantryItemId}/upc?shared=${isShared}`, { upc });
+    return response.data;
+  } catch (error) {
+    console.error('Error associating UPC with pantry item:', error);
+    throw error;
+  }
+};
 
-// Search recipes based on user preferences
+// Recipe API calls
 export const searchRecipes = async (preferences) => {
   const response = await api.post('/api/recipes/search', preferences);
   return response.data;
 };
 
-// Cook a recipe and deduct ingredients from pantry
 export const cookRecipe = async (recipeId) => {
   const response = await api.post('/api/recipes/cook', { recipeId });
   return response.data;
 };
 
-// Get detailed recipe info
-export const getRecipeDetail = async (id) => {
-  const response = await api.get(`/api/recipes/${id}`);
-  return response.data;
-};
-
-// ================= User APIs =================
-
-// Get user dietary preferences
+// ================= User =================
 export const getUserPreferences = async () => {
   const response = await api.get('/api/users/preferences');
   return response.data;
 };
 
-// Update user dietary preferences
 export const updateUserPreferences = async (flags) => {
   const response = await api.put('/api/users/preferences', { flags });
   return response.data;
 };
 
-// ================= Favorites APIs =================
-
-// Add recipe to favorites
+// ================= Favorites =================
 export const addFavorite = async (recipe) => {
   const response = await api.post('/api/favorites', {
     recipe_id: recipe.id,
@@ -199,33 +199,32 @@ export const addFavorite = async (recipe) => {
   return response.data;
 };
 
-// Remove recipe from favorites
 export const removeFavorite = async (recipeId) => {
   const response = await api.delete(`/api/favorites/${recipeId}`);
   return response.data;
 };
 
-// Get all favorite recipes
 export const getFavorites = async () => {
   const response = await api.get('/api/favorites');
   return response.data;
 };
 
-// ================= Shopping List APIs =================
+export const getRecipeDetail = async (id) => {
+  const response = await api.get(`/api/recipes/${id}`);
+  return response.data;
+};
 
-// Get shopping list
+// ================= Shopping List =================
 export const getShoppingList = async () => {
   const response = await api.get('/api/shopping-list');
   return response.data;
 };
 
-// Add item to shopping list
 export const addShoppingListItem = async (item) => {
   const response = await api.post('/api/shopping-list', item);
   return response.data;
 };
 
-// Add missing ingredients from recipe to shopping list
 export const addMissingIngredientsToShoppingList = async (recipeId, missingIngredients) => {
   const response = await api.post('/api/shopping-list/from-recipe', {
     recipeId,
@@ -234,13 +233,11 @@ export const addMissingIngredientsToShoppingList = async (recipeId, missingIngre
   return response.data;
 };
 
-// Update shopping list item status (checked/unchecked)
 export const updateShoppingListItem = async (id, checked) => {
   const response = await api.patch(`/api/shopping-list/${id}`, { checked });
   return response.data;
 };
 
-// Delete shopping list item
 export const deleteShoppingListItem = async (id) => {
   const response = await api.delete(`/api/shopping-list/${id}`);
   return response.data;

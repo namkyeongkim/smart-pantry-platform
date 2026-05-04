@@ -8,7 +8,7 @@ function Users() {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     try {
       const res = await api.get('/admin/users');
       setUsers(res.data);

@@ -8,7 +8,7 @@ function Recipes() {
     fetchRecipes();
   }, []);
 
-  const fetchRecipes = async () => {
+  async function fetchRecipes() {
     try {
       const res = await api.get('/admin/recipes');
       setRecipes(res.data);

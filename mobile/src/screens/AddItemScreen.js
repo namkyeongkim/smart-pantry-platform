@@ -11,7 +11,7 @@ import {
   ScrollView,
   Keyboard,
 } from 'react-native';
-import { addPantryItem, getIngredientSuggestions } from '../services/api';
+import { addPantryItem, getIngredientSuggestions, getActiveSharedPantry } from '../services/api';
 
 const AddItemScreen = ({ navigation }) => {
   const [name, setName] = useState('');
@@ -24,6 +24,9 @@ const AddItemScreen = ({ navigation }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedFromList, setSelectedFromList] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+
+  const [activeSharedPantry, setActiveSharedPantry] = useState(null);
+  const [addToShared, setAddToShared] = useState(false);
 
   const units = ['pieces', 'grams', 'kg', 'ml', 'liters', 'cups', 'tbsp', 'tsp'];
 
@@ -39,7 +42,18 @@ const AddItemScreen = ({ navigation }) => {
         setLoadingSuggestions(false);
       }
     };
+    
+    const loadSharedState = async () => {
+      try {
+        const shared = await getActiveSharedPantry();
+        setActiveSharedPantry(shared);
+      } catch (err) {
+        setActiveSharedPantry(null);
+      }
+    };
+    
     loadSuggestions();
+    loadSharedState();
   }, []);
 
   // Filter suggestions based on current input
@@ -108,7 +122,7 @@ const AddItemScreen = ({ navigation }) => {
         name: name.trim().toLowerCase(),
         quantity: parseFloat(quantity),
         unit: unit,
-      });
+      }, addToShared);
       Alert.alert('Success', `${name.trim()} added to pantry!`);
       navigation.goBack();
     } catch (error) {
@@ -155,6 +169,27 @@ const AddItemScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.form}>
+          {/* Target Pantry Toggle */}
+          {activeSharedPantry && (
+            <View style={styles.targetContainer}>
+              <Text style={styles.label}>Add to</Text>
+              <View style={styles.toggleContainer}>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, !addToShared && styles.toggleButtonActive]}
+                  onPress={() => setAddToShared(false)}
+                >
+                  <Text style={[styles.toggleText, !addToShared && styles.toggleTextActive]}>Personal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, addToShared && styles.toggleButtonActive]}
+                  onPress={() => setAddToShared(true)}
+                >
+                  <Text style={[styles.toggleText, addToShared && styles.toggleTextActive]}>Shared</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Ingredient Name with Autocomplete */}
           <Text style={styles.label}>Ingredient Name *</Text>
           <View style={styles.inputContainer}>
@@ -477,6 +512,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  targetContainer: {
+    marginBottom: 10,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#e0ddd8',
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#5a7559',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#5a6b5c',
+  },
+  toggleTextActive: {
+    color: '#fff',
   },
 });
 

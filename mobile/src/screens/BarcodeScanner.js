@@ -1,24 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Camera, CameraView } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
-import {
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Alert,
-} from 'react-native';
-import {
-  getPantryItems,
-  associateUPCWithPantryItem,
-  addPantryItem,
-} from '../services/api';
+import { Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, FlatList, Modal, Alert } from 'react-native';
+import { getPantryItems, associateUPCWithPantryItem, addPantryItem } from '../services/api';
 
 export default function BarcodeScanner({ navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
@@ -30,12 +14,6 @@ export default function BarcodeScanner({ navigation }) {
   const [showPantryModal, setShowPantryModal] = useState(false);
   const [pantryItems, setPantryItems] = useState([]);
   const [loadingPantry, setLoadingPantry] = useState(false);
-
-  const [scannedQuantity, setScannedQuantity] = useState('1');
-  const [scannedUnit, setScannedUnit] = useState('pieces');
-
-  const units = ['pieces', 'grams', 'kg', 'ml', 'liters', 'cups', 'tbsp', 'tsp'];
-  const scanLockRef = useRef(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -53,11 +31,8 @@ export default function BarcodeScanner({ navigation }) {
 
   const lookupProduct = async (codeOverride) => {
     const codeToLookup = (codeOverride ?? scannedCode).trim();
-
     if (!codeToLookup) {
       setError('Please scan a barcode or try again.');
-      scanLockRef.current = false;
-      setIsScanning(true);
       return;
     }
 
@@ -66,46 +41,33 @@ export default function BarcodeScanner({ navigation }) {
     setProduct(null);
 
     try {
-      const response = await fetch(
-        `https://world.openfoodfacts.org/api/v0/product/${codeToLookup}.json`,
-        {
-          headers: {
-            Accept: 'application/json',
-          },
+      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${codeToLookup}.json`, {
+        headers: {
+          'User-Agent': 'PantryRecipeApp - Android/iOS - Version 1.0',
+          'Accept': 'application/json'
         }
-      );
-
-      const text = await response.text();
-      console.log('OpenFoodFacts response:', text.slice(0, 200));
-
-      if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-        throw new Error('OpenFoodFacts returned non-JSON response');
+      });
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
       }
-
-      const result = JSON.parse(text);
+      
+      const result = await response.json();
 
       if (result.status === 1 && result.product) {
         setProduct({
-          name:
-            result.product.product_name ||
-            result.product.generic_name ||
-            'Unknown product',
+          name: result.product.product_name || result.product.generic_name || 'Unknown product',
           brand: result.product.brands,
           code: codeToLookup,
         });
-
-        setScannedQuantity('1');
-        setScannedUnit('pieces');
         setIsScanning(false);
       } else {
         setError('Product not found. Try scanning another barcode.');
-        scanLockRef.current = false;
         setIsScanning(true);
       }
     } catch (err) {
-      console.error('Barcode lookup error:', err);
-      setError('Could not lookup barcode. Check connection and try again.');
-      scanLockRef.current = false;
+      setError('Could not lookup barcode. Service may be unavailable.');
+      console.error('Barcode lookup error:', err.message || err);
       setIsScanning(true);
     } finally {
       setLoading(false);
@@ -113,22 +75,21 @@ export default function BarcodeScanner({ navigation }) {
   };
 
   const handleBarcodeScanned = (result) => {
-    if (scanLockRef.current || !isScanning || loading) return;
-
-    scanLockRef.current = true;
+    if (!isScanning) return;
 
     const detectedCode = result.data;
     console.log('Barcode scanned:', detectedCode);
-
     setScannedCode(detectedCode);
     setIsScanning(false);
-    lookupProduct(detectedCode);
+    // Auto-lookup after detection
+    setTimeout(() => {
+      lookupProduct(detectedCode);
+    }, 500);
   };
 
   const openPantrySelection = async () => {
     setLoadingPantry(true);
     setShowPantryModal(true);
-
     try {
       const items = await getPantryItems();
       setPantryItems(items);
@@ -143,15 +104,12 @@ export default function BarcodeScanner({ navigation }) {
   const selectPantryItem = async (pantryItem) => {
     try {
       setLoading(true);
-
       await associateUPCWithPantryItem(pantryItem.id, scannedCode);
-
       setProduct({
         name: pantryItem.name,
         code: scannedCode,
         fromPantry: true,
       });
-
       setError('');
       setShowPantryModal(false);
     } catch (error) {
@@ -164,25 +122,14 @@ export default function BarcodeScanner({ navigation }) {
 
   const addScannedToPantry = async () => {
     if (!product?.name) return;
-
-    if (!scannedQuantity || parseFloat(scannedQuantity) <= 0) {
-      Alert.alert('Error', 'Please enter a valid quantity.');
-      return;
-    }
-
     try {
       setLoading(true);
-
       await addPantryItem({
         name: product.name,
-        quantity: parseFloat(scannedQuantity),
-        unit: scannedUnit,
+        quantity: 1,
+        unit: 'pieces',
       });
-
-      Alert.alert(
-        'Added',
-        `${scannedQuantity} ${scannedUnit} of ${product.name} added to pantry.`
-      );
+      Alert.alert('Added', 'Item added to pantry.');
     } catch (error) {
       console.error('Error adding scanned item:', error);
       Alert.alert('Error', 'Failed to add item to pantry.');
@@ -191,25 +138,11 @@ export default function BarcodeScanner({ navigation }) {
     }
   };
 
-  const resetScanner = () => {
-    scanLockRef.current = false;
-    setScannedCode('');
-    setProduct(null);
-    setError('');
-    setScannedQuantity('1');
-    setScannedUnit('pieces');
-    setIsScanning(true);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Scan UPC</Text>
-
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
           <Text style={styles.closeText}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -231,13 +164,12 @@ export default function BarcodeScanner({ navigation }) {
           <View style={styles.cameraContainer}>
             <CameraView
               style={styles.camera}
-              facing="back"
+              facing={'back'}
               onBarcodeScanned={isScanning ? handleBarcodeScanned : undefined}
               barcodeScannerSettings={{
                 barcodeTypes: ['upc_a', 'upc_e', 'ean8', 'ean13'],
               }}
             />
-
             <View style={styles.barcodeGuide}>
               <View style={styles.guideBorder} />
               <Text style={styles.guideText}>Position barcode in frame</Text>
@@ -248,8 +180,15 @@ export default function BarcodeScanner({ navigation }) {
             <View style={styles.scannedInfo}>
               <Text style={styles.scannedLabel}>Detected Code:</Text>
               <Text style={styles.scannedCode}>{scannedCode}</Text>
-
-              <TouchableOpacity style={styles.rescanButton} onPress={resetScanner}>
+              <TouchableOpacity
+                style={styles.rescanButton}
+                onPress={() => {
+                  setScannedCode('');
+                  setProduct(null);
+                  setError('');
+                  setIsScanning(true);
+                }}
+              >
                 <Text style={styles.rescanText}>Scan Another</Text>
               </TouchableOpacity>
             </View>
@@ -263,7 +202,6 @@ export default function BarcodeScanner({ navigation }) {
           ) : error ? (
             <View style={styles.resultCard}>
               <Text style={styles.errorText}>{error}</Text>
-
               <TouchableOpacity
                 style={styles.pantryButton}
                 onPress={openPantrySelection}
@@ -274,58 +212,9 @@ export default function BarcodeScanner({ navigation }) {
           ) : product ? (
             <View style={styles.resultCard}>
               <Text style={styles.productName}>{product.name}</Text>
-
-              {product.brand && (
-                <Text style={styles.productBrand}>{product.brand}</Text>
-              )}
-
+              {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
               <Text style={styles.productCode}>UPC: {product.code}</Text>
-
-              {!product.fromPantry && (
-                <View style={styles.quantitySection}>
-                  <Text style={styles.quantityLabel}>Quantity</Text>
-
-                  <TextInput
-                    style={styles.quantityInput}
-                    value={scannedQuantity}
-                    onChangeText={setScannedQuantity}
-                    keyboardType="numeric"
-                    placeholder="Quantity"
-                    placeholderTextColor="#999"
-                  />
-
-                  <Text style={styles.quantityLabel}>Unit</Text>
-
-                  <View style={styles.unitWrap}>
-                    {units.map((u) => (
-                      <TouchableOpacity
-                        key={u}
-                        style={[
-                          styles.unitButton,
-                          scannedUnit === u && styles.unitButtonSelected,
-                        ]}
-                        onPress={() => setScannedUnit(u)}
-                      >
-                        <Text
-                          style={[
-                            styles.unitButtonText,
-                            scannedUnit === u && styles.unitButtonTextSelected,
-                          ]}
-                        >
-                          {u}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {product.fromPantry && (
-                <Text style={styles.pantryNote}>
-                  Associated from your pantry
-                </Text>
-              )}
-
+              {product.fromPantry && <Text style={styles.pantryNote}>Associated from your pantry</Text>}
               {!product.fromPantry && (
                 <TouchableOpacity
                   style={styles.pantryButton}
@@ -338,7 +227,6 @@ export default function BarcodeScanner({ navigation }) {
           ) : null}
         </>
       )}
-
       <StatusBar style="light" />
 
       <Modal
@@ -349,7 +237,6 @@ export default function BarcodeScanner({ navigation }) {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Pantry Item</Text>
-
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowPantryModal(false)}
@@ -530,56 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
-  },
-  quantitySection: {
-    width: '100%',
-    marginTop: 14,
-    alignItems: 'center',
-  },
-  quantityLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  quantityInput: {
-    width: '80%',
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  unitWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  unitButton: {
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  unitButtonSelected: {
-    backgroundColor: '#5a7559',
-    borderColor: '#5a7559',
-  },
-  unitButtonText: {
-    color: '#333',
-    fontSize: 13,
-  },
-  unitButtonTextSelected: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   pantryNote: {
     fontSize: 12,

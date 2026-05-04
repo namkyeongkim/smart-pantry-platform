@@ -1,0 +1,30 @@
+{
+  "pantries": [
+    {
+      "id": "5k46d9cj",
+      "name": "test",
+      "code": "RVRW5R",
+      "ownerId": 1,
+      "virtualId": 19
+    },
+    {
+      "id": "wgvf8knz",
+      "name": "test name",
+      "code": "HU1LNV",
+      "ownerId": 1,
+      "virtualId": 20
+    },
+    {
+      "id": "7l9rm1gx",
+      "name": "test pantry",
+      "code": "L5AYHC",
+      "ownerId": 7,
+      "virtualId": 21
+    }
+  ],
+  "user_pantries": {
+    "1": "wgvf8knz",
+    "7": "7l9rm1gx",
+    "22": "7l9rm1gx"
+  }
+}

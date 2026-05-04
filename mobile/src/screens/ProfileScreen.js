@@ -10,9 +10,17 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput
 } from 'react-native';
-import { getUserPreferences, updateUserPreferences } from '../services/api';
+import {
+  getUserPreferences,
+  updateUserPreferences,
+  getActiveSharedPantry,
+  createSharedPantry,
+  joinSharedPantry,
+  leaveSharedPantry
+} from '../services/api';
 
 // Map display key to what the backend dietary_flags table stores
 const FLAG_MAP = {
@@ -38,6 +46,10 @@ const ProfileScreen = ({ navigation, route, onLogout }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [activePantry, setActivePantry] = useState(null);
+  const [pantryNameInput, setPantryNameInput] = useState('');
+  const [pantryCodeInput, setPantryCodeInput] = useState('');
+
   // Load saved preferences on mount
   useEffect(() => {
     const loadPreferences = async () => {
@@ -55,7 +67,16 @@ const ProfileScreen = ({ navigation, route, onLogout }) => {
         setLoading(false);
       }
     };
+    const loadSharedPantry = async () => {
+      try {
+        const p = await getActiveSharedPantry();
+        setActivePantry(p);
+      } catch (err) {
+        console.error('Failed to load shared pantry:', err);
+      }
+    };
     loadPreferences();
+    loadSharedPantry();
   }, []);
 
   useLayoutEffect(() => {
@@ -150,6 +171,40 @@ const ProfileScreen = ({ navigation, route, onLogout }) => {
     </View>
   );
 
+  const handleCreatePantry = async () => {
+    if (!pantryNameInput) return Alert.alert('Error', 'Please enter a name for the pantry');
+    try {
+      const res = await createSharedPantry(pantryNameInput);
+      setActivePantry({ name: pantryNameInput, code: res.code });
+      setPantryNameInput('');
+      Alert.alert('Success', `Shared pantry created! Your invite code is ${res.code}`);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to create shared pantry');
+    }
+  };
+
+  const handleJoinPantry = async () => {
+    if (!pantryCodeInput) return Alert.alert('Error', 'Please enter an invite code');
+    try {
+      const res = await joinSharedPantry(pantryCodeInput);
+      setActivePantry({ name: res.name, code: pantryCodeInput });
+      setPantryCodeInput('');
+      Alert.alert('Success', `Joined ${res.name}!`);
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed to join shared pantry');
+    }
+  };
+
+  const handleLeavePantry = async () => {
+    try {
+      await leaveSharedPantry();
+      setActivePantry(null);
+      Alert.alert('Success', 'Left shared pantry');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to leave shared pantry');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -160,7 +215,7 @@ const ProfileScreen = ({ navigation, route, onLogout }) => {
           </View>
           <Text style={styles.headerTitle}>Dietary Profile</Text>
           <Text style={styles.headerSubtitle}>
-            Set your dietary preferences and we'll personalize recipe suggestions just for you
+            Set your dietary preferences and we&apos;ll personalize recipe suggestions just for you
           </Text>
         </View>
 
@@ -214,6 +269,50 @@ const ProfileScreen = ({ navigation, route, onLogout }) => {
               />
             </>
           )}
+        </View>
+
+        {/* Shared Pantry Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Shared Pantry</Text>
+          <View style={styles.card}>
+            {activePantry ? (
+              <View>
+                <Text style={styles.preferenceTitle}>Currently in: {activePantry.name}</Text>
+                <Text style={styles.preferenceDesc}>Invite Code: {activePantry.code}</Text>
+                <TouchableOpacity style={styles.leaveButton} onPress={handleLeavePantry}>
+                  <Text style={styles.leaveButtonText}>Leave Shared Pantry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.preferenceTitle}>Create a Shared Pantry</Text>
+                <View style={{flexDirection: 'row', marginTop: 8}}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Pantry Name"
+                    value={pantryNameInput}
+                    onChangeText={setPantryNameInput}
+                  />
+                  <TouchableOpacity style={styles.actionButton} onPress={handleCreatePantry}>
+                    <Text style={styles.actionButtonText}>Create</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={[styles.preferenceTitle, {marginTop: 16}]}>Join a Shared Pantry</Text>
+                <View style={{flexDirection: 'row', marginTop: 8}}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Invite Code"
+                    value={pantryCodeInput}
+                    onChangeText={setPantryCodeInput}
+                  />
+                  <TouchableOpacity style={styles.actionButton} onPress={handleJoinPantry}>
+                    <Text style={styles.actionButtonText}>Join</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Logout Button */}
@@ -335,6 +434,53 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600'
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#3d4a3e',
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 10,
+    marginRight: 8,
+    backgroundColor: '#f9fafb'
+  },
+  actionButton: {
+    backgroundColor: '#5a7559',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: '600'
+  },
+  leaveButton: {
+    backgroundColor: '#fde8e8',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12
+  },
+  leaveButtonText: {
+    color: '#dc2626',
     fontWeight: '600'
   }
 });

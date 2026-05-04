@@ -19,6 +19,7 @@ const recipeRoutes = require('./routes/recipes');
 const favoritesRoutes = require('./routes/favorites');
 const adminRoutes = require('./routes/admin');
 const shoppingListRoutes = require('./routes/shoppingList');
+const sharedPantryRoutes = require('./routes/shared_pantry');
 
 // Use Routes
 app.use('/api/users', userRoutes);
@@ -27,6 +28,7 @@ app.use('/api/recipes', recipeRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/admin', adminRoutes);
 app.use('/api/shopping-list', shoppingListRoutes);
+app.use('/api/shared-pantry', sharedPantryRoutes);
 
 
 // Test Route
