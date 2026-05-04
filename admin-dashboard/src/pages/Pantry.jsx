@@ -15,13 +15,16 @@ function Pantry() {
     } catch (error) {
       console.error('Pantry error:', error);
     }
-  };
+  }
 
   return (
     <div className="dashboard-page">
       <div className="page-heading">
         <h1>Pantry</h1>
-        <p>View ingredient usage and total pantry quantities across users.</p>
+        <p>
+          View ingredient usage and compare private pantry items with shared
+          pantry items.
+        </p>
       </div>
 
       <div className="section-card">
@@ -34,8 +37,10 @@ function Pantry() {
               <th>Total Quantity</th>
               <th>Unit</th>
               <th>Users Holding Item</th>
+              <th>Pantry Type</th>
             </tr>
           </thead>
+
           <tbody>
             {pantryItems.map((item, index) => (
               <tr key={index}>
@@ -43,6 +48,17 @@ function Pantry() {
                 <td>{item.total_quantity}</td>
                 <td>{item.unit || 'N/A'}</td>
                 <td>{item.user_count}</td>
+                <td>
+                  <span
+                    className={
+                      item.pantry_type === 'shared'
+                        ? 'type-badge shared-badge'
+                        : 'type-badge private-badge'
+                    }
+                  >
+                    {item.pantry_type || 'private'}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

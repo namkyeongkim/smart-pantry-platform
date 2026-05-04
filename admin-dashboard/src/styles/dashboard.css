@@ -1,3 +1,4 @@
+/* Global styles */
 body {
   margin: 0;
   font-family: Inter, Arial, sans-serif;
@@ -13,6 +14,7 @@ a {
   text-decoration: none;
 }
 
+/* Layout */
 .app-layout {
   display: flex;
   min-height: 100vh;
@@ -63,6 +65,7 @@ a {
   flex-direction: column;
 }
 
+/* Header */
 .top-header {
   height: 76px;
   background: white;
@@ -120,6 +123,7 @@ a {
   padding: 24px;
 }
 
+/* Dashboard */
 .dashboard-page {
   display: flex;
   flex-direction: column;
@@ -140,17 +144,17 @@ a {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 20px;
 }
 
+/* Stat cards */
 .stat-card {
   background: white;
   border-radius: 16px;
   padding: 22px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  opacity: 1;
 }
 
 .stat-card:hover {
@@ -158,21 +162,14 @@ a {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
-.stat-card:nth-child(1) {
-  border-left: 5px solid #3b82f6;
-}
-
-.stat-card:nth-child(2) {
-  border-left: 5px solid #10b981;
-}
-
-.stat-card:nth-child(3) {
-  border-left: 5px solid #f59e0b;
-}
-
-.stat-card:nth-child(4) {
-  border-left: 5px solid #ef4444;
-}
+/* Default color indicators */
+.stat-card:nth-child(1) { border-left: 5px solid #3b82f6; }
+.stat-card:nth-child(2) { border-left: 5px solid #10b981; }
+.stat-card:nth-child(3) { border-left: 5px solid #f59e0b; }
+.stat-card:nth-child(4) { border-left: 5px solid #ef4444; }
+.stat-card:nth-child(5) { border-left: 5px solid #8b5cf6; }
+.stat-card:nth-child(6) { border-left: 5px solid #06b6d4; }
+.stat-card:nth-child(7) { border-left: 5px solid #ec4899; }
 
 .stat-title {
   margin: 0;
@@ -184,10 +181,10 @@ a {
   margin: 14px 0 0;
   font-size: 34px;
   font-weight: 700;
-  color: #111827 !important;
-  opacity: 1;
+  color: #111827;
 }
 
+/* Sections */
 .section-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -208,6 +205,7 @@ a {
   color: #111827;
 }
 
+/* Tables */
 .dashboard-table {
   width: 100%;
   border-collapse: collapse;
@@ -234,6 +232,7 @@ a {
   background-color: #f9fafb;
 }
 
+/* Warnings */
 .low-stock-warning {
   color: #dc2626;
   font-weight: 700;
@@ -244,6 +243,7 @@ a {
   font-weight: 700;
 }
 
+/* Responsive */
 @media (max-width: 1100px) {
   .stats-grid {
     grid-template-columns: 1fr 1fr;

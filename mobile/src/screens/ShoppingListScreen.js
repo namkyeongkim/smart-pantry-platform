@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,6 +31,7 @@ const ShoppingListScreen = ({ navigation }) => {
   const [selectedList, setSelectedList] = useState([]);
   const [quantityInput, setQuantityInput] = useState('1');
   const [unitInput, setUnitInput] = useState('pieces');
+  const [isSharedPantry, setIsSharedPantry] = useState(false);
 
   const loadShoppingList = async () => {
     try {
@@ -59,6 +63,7 @@ const ShoppingListScreen = ({ navigation }) => {
     );
   };
 
+  // Split combined ingredient names into separate pantry items.
   const splitIngredientName = (name) => {
     return String(name || '')
       .toLowerCase()
@@ -67,6 +72,7 @@ const ShoppingListScreen = ({ navigation }) => {
       .filter(Boolean);
   };
 
+  // Guess a default unit to make the input faster for the user.
   const getDefaultUnit = (name) => {
     const lower = String(name || '').toLowerCase();
 
@@ -74,12 +80,12 @@ const ShoppingListScreen = ({ navigation }) => {
     if (gramItems.some((k) => lower.includes(k))) return 'grams';
 
     const liquidItems = ['oil', 'milk', 'water', 'vinegar', 'soy sauce'];
-    if (liquidItems.some((k) => lower.includes(k))) return 'milliliters';
+    if (liquidItems.some((k) => lower.includes(k))) return 'ml';
 
     return 'pieces';
   };
 
-  const openInputModal = () => {
+  const openInputModal = (shared = false) => {
     const chosen = items.filter((item) => selectedItems.includes(item.id));
 
     if (chosen.length === 0) {
@@ -87,6 +93,7 @@ const ShoppingListScreen = ({ navigation }) => {
       return;
     }
 
+    setIsSharedPantry(shared);
     setSelectedList(chosen);
     setCurrentIndex(0);
     setQuantityInput('1');
@@ -108,12 +115,16 @@ const ShoppingListScreen = ({ navigation }) => {
     try {
       const splitNames = splitIngredientName(currentItem.ingredient_name);
 
+      // Add the selected shopping list item to either personal or shared pantry.
       for (const name of splitNames) {
-        await addPantryItem({
-          name,
-          quantity,
-          unit: unitInput.trim() || 'pieces',
-        });
+        await addPantryItem(
+          {
+            name,
+            quantity,
+            unit: unitInput.trim() || 'pieces',
+          },
+          isSharedPantry
+        );
       }
 
       await deleteShoppingListItem(currentItem.id);
@@ -122,6 +133,7 @@ const ShoppingListScreen = ({ navigation }) => {
 
       if (nextIndex < selectedList.length) {
         const nextItem = selectedList[nextIndex];
+
         setCurrentIndex(nextIndex);
         setQuantityInput('1');
         setUnitInput(getDefaultUnit(nextItem.ingredient_name));
@@ -131,15 +143,22 @@ const ShoppingListScreen = ({ navigation }) => {
         setItems((prev) =>
           prev.filter((item) => !processedIds.includes(item.id))
         );
+
         setSelectedItems([]);
         setModalVisible(false);
 
-        Alert.alert('Success', 'Selected items were added to your pantry.', [
-          {
-            text: 'Back to Recipe',
-            onPress: () => navigation.goBack(),
-          },
-        ]);
+        Alert.alert(
+          'Success',
+          isSharedPantry
+            ? 'Selected items were added to shared pantry.'
+            : 'Selected items were added to your pantry.',
+          [
+            {
+              text: 'Back to Recipe',
+              onPress: () => navigation.goBack(),
+            },
+          ]
+        );
       }
     } catch (error) {
       console.log(
@@ -153,6 +172,7 @@ const ShoppingListScreen = ({ navigation }) => {
   const handleDeleteItem = async (id) => {
     try {
       await deleteShoppingListItem(id);
+
       setItems((prev) => prev.filter((item) => item.id !== id));
       setSelectedItems((prev) => prev.filter((itemId) => itemId !== id));
     } catch (error) {
@@ -182,6 +202,11 @@ const ShoppingListScreen = ({ navigation }) => {
 
         <View style={styles.itemContent}>
           <Text style={styles.itemName}>{item.ingredient_name}</Text>
+          {(item.quantity || item.unit) && (
+            <Text style={styles.itemMeta}>
+              {item.quantity ? item.quantity : ''} {item.unit ? item.unit : ''}
+            </Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -221,12 +246,21 @@ const ShoppingListScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
           />
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={openInputModal}
-          >
-            <Text style={styles.buttonText}>Add Selected to Pantry</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomButtons}>
+            <TouchableOpacity
+              style={[styles.button, styles.myPantryButton]}
+              onPress={() => openInputModal(false)}
+            >
+              <Text style={styles.buttonText}>Add to My Pantry</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.sharedPantryButton]}
+              onPress={() => openInputModal(true)}
+            >
+              <Text style={styles.buttonText}>Add to Shared Pantry</Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
@@ -236,60 +270,73 @@ const ShoppingListScreen = ({ navigation }) => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Add to Pantry
-            </Text>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {isSharedPantry ? 'Add to Shared Pantry' : 'Add to My Pantry'}
+              </Text>
 
-            <Text style={styles.modalSubtitle}>
-              {currentItem
-                ? `${currentIndex + 1} of ${selectedList.length}: ${currentItem.ingredient_name}`
-                : ''}
-            </Text>
+              <Text style={styles.modalSubtitle}>
+                {currentItem
+                  ? `${currentIndex + 1} of ${selectedList.length}: ${
+                      currentItem.ingredient_name
+                    }`
+                  : ''}
+              </Text>
 
-            <View style={styles.inputSection}>
-              <Text style={styles.inputLabel}>Quantity</Text>
-              <TextInput
-                style={styles.input}
-                value={quantityInput}
-                onChangeText={setQuantityInput}
-                keyboardType="numeric"
-                placeholder="Enter quantity"
-                placeholderTextColor="#999"
-              />
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Quantity</Text>
+                <TextInput
+                  style={styles.input}
+                  value={quantityInput}
+                  onChangeText={setQuantityInput}
+                  keyboardType="numeric"
+                  placeholder="Enter quantity"
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Unit</Text>
+                <TextInput
+                  style={styles.input}
+                  value={unitInput}
+                  onChangeText={setUnitInput}
+                  placeholder="grams / ml / pieces"
+                  placeholderTextColor="#999"
+                  returnKeyType="done"
+                />
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelModalButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelModalText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmModalButton]}
+                  onPress={handleAddCurrentItem}
+                >
+                  <Text style={styles.confirmModalText}>
+                    {currentIndex === selectedList.length - 1
+                      ? 'Finish'
+                      : 'Next'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <View style={styles.inputSection}>
-              <Text style={styles.inputLabel}>Unit</Text>
-              <TextInput
-                style={styles.input}
-                value={unitInput}
-                onChangeText={setUnitInput}
-                placeholder="Enter unit"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelModalButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelModalText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmModalButton]}
-                onPress={handleAddCurrentItem}
-              >
-                <Text style={styles.confirmModalText}>
-                  {currentIndex === selectedList.length - 1 ? 'Finish' : 'Next'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -308,7 +355,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   itemCard: {
     flexDirection: 'row',
@@ -343,6 +390,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
   },
+  itemMeta: {
+    marginTop: 4,
+    color: '#7f8c8d',
+    fontSize: 13,
+  },
   deleteButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -353,20 +405,31 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
-  button: {
+  bottomButtons: {
     position: 'absolute',
     left: 16,
     right: 16,
     bottom: 16,
-    backgroundColor: '#27ae60',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  button: {
+    flex: 1,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
+  myPantryButton: {
+    backgroundColor: '#27ae60',
+  },
+  sharedPantryButton: {
+    backgroundColor: '#2980b9',
+  },
   buttonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
+    textAlign: 'center',
   },
   emptyBox: {
     backgroundColor: 'white',
@@ -387,8 +450,12 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  modalScrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 24,
   },
   modalContent: {
     width: '85%',
