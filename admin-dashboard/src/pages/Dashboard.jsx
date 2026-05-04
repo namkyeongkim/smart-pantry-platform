@@ -20,7 +20,7 @@ function Dashboard() {
     fetchLowStock();
   }, []);
 
-  const fetchStats = async () => {
+  async function fetchStats() {
     try {
       const res = await api.get('/admin/stats');
       setStats(res.data);
@@ -29,7 +29,7 @@ function Dashboard() {
     }
   };
 
-  const fetchTopRecipes = async () => {
+  async function fetchTopRecipes() {
     try {
       const res = await api.get('/admin/recipes/top');
       setTopRecipes(res.data);
@@ -38,7 +38,7 @@ function Dashboard() {
     }
   };
 
-  const fetchLowStock = async () => {
+  async function fetchLowStock() {
     try {
       const res = await api.get('/admin/pantry/low-stock');
       setLowStockItems(res.data);

@@ -8,7 +8,7 @@ function Pantry() {
     fetchPantry();
   }, []);
 
-  const fetchPantry = async () => {
+  async function fetchPantry() {
     try {
       const res = await api.get('/admin/pantry');
       setPantryItems(res.data);

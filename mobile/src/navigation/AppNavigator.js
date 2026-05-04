@@ -28,14 +28,17 @@ const AppNavigator = ({ token, user, onLogout }) => {
     }
   }, [token]);
 
+  // Custom header for Home screen
   const HomeHeader = ({ navigation }) => (
     <View style={styles.homeHeader}>
       <View style={styles.headerTop}>
+        {/* Logo */}
         <View style={styles.logoContainer}>
           <Text style={styles.logoEmoji}>🧺</Text>
           <Text style={styles.logoText}>PANTRY</Text>
         </View>
 
+        {/* Navigation Buttons */}
         <View style={styles.navButtons}>
           <TouchableOpacity
             style={styles.navButton}
@@ -169,7 +172,6 @@ const AppNavigator = ({ token, user, onLogout }) => {
           component={ShoppingListScreen}
           options={{ title: 'Shopping List' }}
         />
-
         <Stack.Screen
           name="BarcodeScanner"
           component={BarcodeScanner}

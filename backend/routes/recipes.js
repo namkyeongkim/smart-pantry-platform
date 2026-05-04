@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const axios = require('axios');
 const authenticateToken = require('../middleware/auth');
+const sharedPantryService = require('../shared_pantry_service');
 
 const SPOONACULAR_API_KEY = process.env.SPOONACULAR_API_KEY;
 
@@ -134,6 +135,7 @@ router.post('/search', authenticateToken, async (req, res) => {
   try {
     const { cuisine, maxCookTime, dietaryRestrictions } = req.body;
     const userId = req.user.id;
+    const pantryUserId = sharedPantryService.getTargetUserId(userId);
 
     // 1. Fetch user's saved dietary preferences
     const prefResult = await pool.query(
@@ -150,8 +152,8 @@ router.post('/search', authenticateToken, async (req, res) => {
       `SELECT i.name
        FROM pantry_items pi
        JOIN ingredients i ON pi.ingredient_id = i.id
-       WHERE pi.user_id = $1`,
-      [userId]
+       WHERE pi.user_id IN ($1, $2)`,
+      [userId, pantryUserId]
     );
     const pantryNames = pantryResult.rows.map(i => i.name.toLowerCase());
 
@@ -378,6 +380,7 @@ function convertAmount(amount, fromUnit, toUnit) {
 router.post('/cook', authenticateToken, async (req, res) => {
   const { recipeId } = req.body;
   const userId = req.user.id;
+  const pantryUserId = sharedPantryService.getTargetUserId(userId);
 
   if (!recipeId) {
     return res.status(400).json({ error: 'recipeId is required' });
@@ -399,11 +402,11 @@ router.post('/cook', authenticateToken, async (req, res) => {
 
     // 2. Get user pantry items with ingredient names
     const pantryResult = await pool.query(
-      `SELECT pi.id, i.name, pi.quantity, pi.unit
+      `SELECT pi.id, i.name, pi.quantity, pi.unit, pi.user_id
        FROM pantry_items pi
        JOIN ingredients i ON pi.ingredient_id = i.id
-       WHERE pi.user_id = $1`,
-      [userId]
+       WHERE pi.user_id IN ($1, $2)`,
+      [userId, pantryUserId]
     );
 
     const pantryItems = pantryResult.rows;
@@ -450,16 +453,16 @@ router.post('/cook', authenticateToken, async (req, res) => {
 
         if (newQty <= 0) {
           await pool.query(
-            'DELETE FROM pantry_items WHERE id = $1 AND user_id = $2',
-            [matchedPantry.id, userId]
+            'DELETE FROM pantry_items WHERE id = $1',
+            [matchedPantry.id]
           );
           removedItems.push(matchedPantry.name);
         } else {
           await pool.query(
             `UPDATE pantry_items
              SET quantity = $1, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2 AND user_id = $3`,
-            [parseFloat(newQty.toFixed(2)), matchedPantry.id, userId]
+             WHERE id = $2`,
+            [parseFloat(newQty.toFixed(2)), matchedPantry.id]
           );
           updatedItems.push({ name: matchedPantry.name, deducted: parseFloat(deductAmount.toFixed(2)), unit: matchedPantry.unit, newQuantity: parseFloat(newQty.toFixed(2)) });
         }
@@ -487,6 +490,7 @@ router.post('/cook', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
+  const pantryUserId = sharedPantryService.getTargetUserId(userId);
 
   try {
     const result = await pool.query(
@@ -505,8 +509,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
       `SELECT i.name
        FROM pantry_items pi
        JOIN ingredients i ON pi.ingredient_id = i.id
-       WHERE pi.user_id = $1`,
-      [userId]
+       WHERE pi.user_id IN ($1, $2)`,
+      [userId, pantryUserId]
     );
 
     const pantryNames = pantryResult.rows.map(i =>

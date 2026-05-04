@@ -312,7 +312,7 @@ const CookRecipeScreen = ({ route, navigation }) => {
           <Text style={styles.warningTitle}>⚠️ Important:</Text>
 
           <Text style={styles.warningText}>
-            Clicking "Confirm Cooking" will automatically deduct the ingredients
+            Clicking &quot;Confirm Cooking&quot; will automatically deduct the ingredients
             you have from your pantry inventory.
           </Text>
         </View>

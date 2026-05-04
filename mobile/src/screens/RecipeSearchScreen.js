@@ -236,7 +236,7 @@ const RecipeSearchScreen = ({ navigation }) => {
         <View style={styles.infoBox}>
 
           <Text style={styles.infoText}>
-            💡 We'll find recipes based on what's in your pantry!
+            💡 We&apos;ll find recipes based on what&apos;s in your pantry!
           </Text>
 
         </View>

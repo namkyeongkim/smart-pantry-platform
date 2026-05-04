@@ -14,7 +14,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getPantryItems, deletePantryItem, updatePantryQuantity } from '../services/api';
+import { getPantryItems, deletePantryItem, updatePantryQuantity, getActiveSharedPantry } from '../services/api';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -61,9 +61,11 @@ const CATEGORY_ORDER = [
 
 const PantryScreen = ({ navigation }) => {
   const [pantryItems, setPantryItems] = useState([]);
+  const [activeSharedPantry, setActiveSharedPantry] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [viewingShared, setViewingShared] = useState(false);
 
   useEffect(() => {
     loadPantryItems();
@@ -79,8 +81,23 @@ const PantryScreen = ({ navigation }) => {
   const loadPantryItems = async () => {
     try {
       setLoading(true);
-      const items = await getPantryItems();
+      
+      // Load shared pantry state first
+      let shared = null;
+      try {
+        shared = await getActiveSharedPantry();
+        setActiveSharedPantry(shared);
+      } catch (err) {
+        setActiveSharedPantry(null);
+      }
+
+      // If viewing shared but no shared pantry exists, fallback to personal
+      const isSharedView = shared ? viewingShared : false;
+      if (!shared && viewingShared) setViewingShared(false);
+
+      const items = await getPantryItems(isSharedView);
       setPantryItems(items);
+      
       // Auto-expand all categories on first load
       const cats = {};
       items.forEach(item => {
@@ -101,6 +118,10 @@ const PantryScreen = ({ navigation }) => {
     await loadPantryItems();
     setRefreshing(false);
   };
+
+  useEffect(() => {
+    loadPantryItems();
+  }, [viewingShared]);
 
   const toggleCategory = (category) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -130,9 +151,9 @@ const PantryScreen = ({ navigation }) => {
 
     try {
       if (qty >= currentItem.quantity) {
-        await deletePantryItem(currentItem.id);
+        await deletePantryItem(currentItem.id, viewingShared);
       } else {
-        await updatePantryQuantity(currentItem.id, currentItem.quantity - qty);
+        await updatePantryQuantity(currentItem.id, currentItem.quantity - qty, viewingShared);
       }
       setModalVisible(false);
       loadPantryItems();
@@ -153,7 +174,7 @@ const PantryScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deletePantryItem(currentItem.id);
+              await deletePantryItem(currentItem.id, viewingShared);
               setModalVisible(false);
               loadPantryItems();
             } catch (error) {
@@ -180,6 +201,24 @@ const PantryScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      {/* Toggle View */}
+      {activeSharedPantry && (
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity 
+            style={[styles.toggleButton, !viewingShared && styles.toggleButtonActive]}
+            onPress={() => setViewingShared(false)}
+          >
+            <Text style={[styles.toggleText, !viewingShared && styles.toggleTextActive]}>Personal</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.toggleButton, viewingShared && styles.toggleButtonActive]}
+            onPress={() => setViewingShared(true)}
+          >
+            <Text style={[styles.toggleText, viewingShared && styles.toggleTextActive]}>Shared</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {loading && pantryItems.length === 0 ? (
         <View style={styles.centerContent}>
           <Text style={styles.loadingText}>Loading pantry...</Text>
@@ -187,7 +226,9 @@ const PantryScreen = ({ navigation }) => {
       ) : pantryItems.length === 0 ? (
         <View style={styles.centerContent}>
           <Text style={styles.emptyEmoji}>🥣</Text>
-          <Text style={styles.emptyText}>Your pantry is empty</Text>
+          <Text style={styles.emptyText}>
+            {viewingShared ? 'Shared pantry is empty' : 'Your pantry is empty'}
+          </Text>
           <Text style={styles.emptySubtext}>Add some ingredients to get started!</Text>
         </View>
       ) : (
@@ -199,12 +240,22 @@ const PantryScreen = ({ navigation }) => {
         >
           {/* Summary Header */}
           <View style={styles.summaryHeader}>
-            <Text style={styles.summaryTitle}>Your Pantry</Text>
+            <Text style={styles.summaryTitle}>
+              {viewingShared && activeSharedPantry ? `Shared: ${activeSharedPantry.name}` : 'Your Pantry'}
+            </Text>
             <View style={styles.summaryBadge}>
               <Text style={styles.summaryCount}>{totalItems}</Text>
               <Text style={styles.summaryLabel}>items</Text>
             </View>
           </View>
+          {viewingShared && activeSharedPantry && (
+            <View style={styles.sharedBanner}>
+              <Ionicons name="people" size={16} color="#5a7559" />
+              <Text style={styles.sharedBannerText}>
+                Viewing shared items (Code: {activeSharedPantry.code})
+              </Text>
+            </View>
+          )}
 
           {/* Category Sections */}
           {sortedCategories.map(category => {
@@ -375,6 +426,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#7a8b7c',
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    backgroundColor: '#e0ddd8',
+    borderRadius: 12,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#5a7559',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#5a6b5c',
+  },
+  toggleTextActive: {
+    color: '#fff',
+  },
   listContent: {
     padding: 16,
   },
@@ -411,6 +493,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Category Section
+  sharedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  sharedBannerText: {
+    color: '#2e7d32',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   categorySection: {
     marginBottom: 12,
   },

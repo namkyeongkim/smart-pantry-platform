@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
+const sharedPantryService = require('../shared_pantry_service');
 
 // Categorize ingredients by name keywords
 function categorize(name) {
@@ -76,8 +77,8 @@ router.get('/ingredients', authenticateToken, async (req, res) => {
 // Get all pantry items for logged-in user
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const userId = req.user.id;
-        console.log('Getting pantry for user:', userId);
+        const userId = req.query.shared === 'true' ? sharedPantryService.getTargetUserId(req.user.id) : req.user.id;
+        console.log('Getting pantry for target user:', userId);
         const result = await pool.query(
             `SELECT pi.id, i.name, pi.quantity, pi.unit, pi.updated_at as created_at
              FROM pantry_items pi
@@ -97,8 +98,8 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { name, quantity, unit } = req.body;
-        const userId = req.user.id;
-        console.log('Adding item for user:', userId);
+        const userId = req.query.shared === 'true' ? sharedPantryService.getTargetUserId(req.user.id) : req.user.id;
+        console.log('Adding item for target user:', userId);
 
         // First, check if ingredient exists, if not create it
         let ingredientResult = await pool.query(
@@ -162,7 +163,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { quantity } = req.body;
-        const userId = req.user.id;
+        const userId = req.query.shared === 'true' ? sharedPantryService.getTargetUserId(req.user.id) : req.user.id;
 
         if (quantity === undefined || isNaN(quantity)) {
             return res.status(400).json({ error: 'Valid quantity is required' });
@@ -202,8 +203,8 @@ router.patch('/:id', authenticateToken, async (req, res) => {
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.id;
-        console.log('Deleting item for user:', userId);
+        const userId = req.query.shared === 'true' ? sharedPantryService.getTargetUserId(req.user.id) : req.user.id;
+        console.log('Deleting item for target user:', userId);
 
         await pool.query(
             'DELETE FROM pantry_items WHERE id = $1 AND user_id = $2',
@@ -216,12 +217,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Associate UPC with pantry item
 router.patch('/:id/upc', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { upc } = req.body;
-        const userId = req.user.id;
+        const userId = req.query.shared === 'true' ? sharedPantryService.getTargetUserId(req.user.id) : req.user.id;
         console.log('Associating UPC with pantry item:', id, upc);
 
         // First get the ingredient_id from the pantry item
