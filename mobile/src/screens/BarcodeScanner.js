@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -30,6 +31,10 @@ export default function BarcodeScanner({ navigation }) {
   const [pantryItems, setPantryItems] = useState([]);
   const [loadingPantry, setLoadingPantry] = useState(false);
 
+  const [scannedQuantity, setScannedQuantity] = useState('1');
+  const [scannedUnit, setScannedUnit] = useState('pieces');
+
+  const units = ['pieces', 'grams', 'kg', 'ml', 'liters', 'cups', 'tbsp', 'tsp'];
   const scanLockRef = useRef(false);
 
   useEffect(() => {
@@ -89,6 +94,8 @@ export default function BarcodeScanner({ navigation }) {
           code: codeToLookup,
         });
 
+        setScannedQuantity('1');
+        setScannedUnit('pieces');
         setIsScanning(false);
       } else {
         setError('Product not found. Try scanning another barcode.');
@@ -158,16 +165,24 @@ export default function BarcodeScanner({ navigation }) {
   const addScannedToPantry = async () => {
     if (!product?.name) return;
 
+    if (!scannedQuantity || parseFloat(scannedQuantity) <= 0) {
+      Alert.alert('Error', 'Please enter a valid quantity.');
+      return;
+    }
+
     try {
       setLoading(true);
 
       await addPantryItem({
         name: product.name,
-        quantity: 1,
-        unit: 'pieces',
+        quantity: parseFloat(scannedQuantity),
+        unit: scannedUnit,
       });
 
-      Alert.alert('Added', 'Item added to pantry.');
+      Alert.alert(
+        'Added',
+        `${scannedQuantity} ${scannedUnit} of ${product.name} added to pantry.`
+      );
     } catch (error) {
       console.error('Error adding scanned item:', error);
       Alert.alert('Error', 'Failed to add item to pantry.');
@@ -181,6 +196,8 @@ export default function BarcodeScanner({ navigation }) {
     setScannedCode('');
     setProduct(null);
     setError('');
+    setScannedQuantity('1');
+    setScannedUnit('pieces');
     setIsScanning(true);
   };
 
@@ -263,6 +280,45 @@ export default function BarcodeScanner({ navigation }) {
               )}
 
               <Text style={styles.productCode}>UPC: {product.code}</Text>
+
+              {!product.fromPantry && (
+                <View style={styles.quantitySection}>
+                  <Text style={styles.quantityLabel}>Quantity</Text>
+
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={scannedQuantity}
+                    onChangeText={setScannedQuantity}
+                    keyboardType="numeric"
+                    placeholder="Quantity"
+                    placeholderTextColor="#999"
+                  />
+
+                  <Text style={styles.quantityLabel}>Unit</Text>
+
+                  <View style={styles.unitWrap}>
+                    {units.map((u) => (
+                      <TouchableOpacity
+                        key={u}
+                        style={[
+                          styles.unitButton,
+                          scannedUnit === u && styles.unitButtonSelected,
+                        ]}
+                        onPress={() => setScannedUnit(u)}
+                      >
+                        <Text
+                          style={[
+                            styles.unitButtonText,
+                            scannedUnit === u && styles.unitButtonTextSelected,
+                          ]}
+                        >
+                          {u}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               {product.fromPantry && (
                 <Text style={styles.pantryNote}>
@@ -474,6 +530,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  quantitySection: {
+    width: '100%',
+    marginTop: 14,
+    alignItems: 'center',
+  },
+  quantityLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  quantityInput: {
+    width: '80%',
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#333',
+  },
+  unitWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  unitButton: {
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  unitButtonSelected: {
+    backgroundColor: '#5a7559',
+    borderColor: '#5a7559',
+  },
+  unitButtonText: {
+    color: '#333',
+    fontSize: 13,
+  },
+  unitButtonTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   pantryNote: {
     fontSize: 12,
