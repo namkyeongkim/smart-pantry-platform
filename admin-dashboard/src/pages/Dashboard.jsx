@@ -8,6 +8,9 @@ function Dashboard() {
     totalUsers: 0,
     totalRecipes: 0,
     totalPantryItems: 0,
+    totalPrivatePantryItems: 0,
+    totalSharedPantryItems: 0,
+    totalSharedPantries: 0,
     totalFavorites: 0,
   });
 
@@ -27,7 +30,7 @@ function Dashboard() {
     } catch (error) {
       console.error('Stats error:', error);
     }
-  };
+  }
 
   async function fetchTopRecipes() {
     try {
@@ -36,7 +39,7 @@ function Dashboard() {
     } catch (error) {
       console.error('Top recipes error:', error);
     }
-  };
+  }
 
   async function fetchLowStock() {
     try {
@@ -45,7 +48,7 @@ function Dashboard() {
     } catch (error) {
       console.error('Low stock error:', error);
     }
-  };
+  }
 
   return (
     <div className="dashboard-page">
@@ -58,6 +61,9 @@ function Dashboard() {
         <StatCard title="Total Users" value={stats.totalUsers} />
         <StatCard title="Total Recipes" value={stats.totalRecipes} />
         <StatCard title="Total Pantry Items" value={stats.totalPantryItems} />
+        <StatCard title="Private Pantry Items" value={stats.totalPrivatePantryItems} />
+        <StatCard title="Shared Pantry Items" value={stats.totalSharedPantryItems} />
+        <StatCard title="Shared Pantries" value={stats.totalSharedPantries} />
         <StatCard title="Total Favorites" value={stats.totalFavorites} />
       </div>
 
@@ -81,13 +87,17 @@ function Dashboard() {
                 <tr>
                   <th>Ingredient</th>
                   <th>Quantity</th>
+                  <th>Type</th>
                 </tr>
               </thead>
               <tbody>
                 {lowStockItems.map((item, index) => (
                   <tr key={index}>
                     <td>{item.name}</td>
-                    <td className="low-stock-warning">{item.quantity}</td>
+                    <td className="low-stock-warning">
+                      {item.quantity} {item.unit}
+                    </td>
+                    <td>{item.pantry_type}</td>
                   </tr>
                 ))}
               </tbody>
