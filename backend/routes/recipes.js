@@ -387,7 +387,6 @@ router.post('/cook', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 1. Look up the recipe
     const recipeResult = await pool.query(
       'SELECT * FROM recipes WHERE spoonacular_id = $1',
       [recipeId]
@@ -400,7 +399,6 @@ router.post('/cook', authenticateToken, async (req, res) => {
     const recipe = recipeResult.rows[0];
     const ingredients = recipe.extended_ingredients || [];
 
-    // 2. Get user pantry items with ingredient names
     const pantryResult = await pool.query(
       `SELECT pi.id, i.name, pi.quantity, pi.unit, pi.user_id
        FROM pantry_items pi
@@ -413,9 +411,7 @@ router.post('/cook', authenticateToken, async (req, res) => {
     const updatedItems = [];
     const removedItems = [];
 
-    // 3. For each recipe ingredient, find matching pantry item and deduct
     for (const ing of ingredients) {
-      // Extract name and amount from ingredient
       let ingName, ingAmount, ingUnit;
 
       if (typeof ing === 'object') {
@@ -432,30 +428,38 @@ router.post('/cook', authenticateToken, async (req, res) => {
 
       const words = splitWords(ing);
 
-      // Find a matching pantry item
-      const matchedPantry = pantryItems.find(p => {
+      const matchedPantry = pantryItems.find((p) => {
         const pName = p.name.toLowerCase();
-        return words.some(word =>
-          pName === word ||
-          pName === word.replace(/s$/, '') ||
-          word === pName.replace(/s$/, '') ||
-          pName.includes(word) ||
-          word.includes(pName)
+        return words.some(
+          (word) =>
+            pName === word ||
+            pName === word.replace(/s$/, '') ||
+            word === pName.replace(/s$/, '') ||
+            pName.includes(word) ||
+            word.includes(pName)
         );
       });
 
       if (matchedPantry) {
-        // Convert recipe amount to pantry's unit
-        const deductAmount = convertAmount(ingAmount, ingUnit, matchedPantry.unit);
+        const deductAmount = convertAmount(
+          ingAmount,
+          ingUnit,
+          matchedPantry.unit
+        );
+
         const newQty = Math.max(0, matchedPantry.quantity - deductAmount);
 
-        console.log(`Deducting ${deductAmount.toFixed(2)} ${matchedPantry.unit} of ${matchedPantry.name} (recipe: ${ingAmount} ${ingUnit})`);
+        console.log(
+          `Deducting ${deductAmount.toFixed(2)} ${matchedPantry.unit} of ${
+            matchedPantry.name
+          }`
+        );
 
         if (newQty <= 0) {
-          await pool.query(
-            'DELETE FROM pantry_items WHERE id = $1',
-            [matchedPantry.id]
-          );
+          await pool.query('DELETE FROM pantry_items WHERE id = $1', [
+            matchedPantry.id,
+          ]);
+
           removedItems.push(matchedPantry.name);
         } else {
           await pool.query(
@@ -464,20 +468,31 @@ router.post('/cook', authenticateToken, async (req, res) => {
              WHERE id = $2`,
             [parseFloat(newQty.toFixed(2)), matchedPantry.id]
           );
-          updatedItems.push({ name: matchedPantry.name, deducted: parseFloat(deductAmount.toFixed(2)), unit: matchedPantry.unit, newQuantity: parseFloat(newQty.toFixed(2)) });
+
+          updatedItems.push({
+            name: matchedPantry.name,
+            deducted: parseFloat(deductAmount.toFixed(2)),
+            unit: matchedPantry.unit,
+            newQuantity: parseFloat(newQty.toFixed(2)),
+          });
         }
 
-        // Update local copy so we don't double-deduct the same item
         matchedPantry.quantity = newQty;
       }
     }
 
+    // Record cooking activity for admin analytics.
+    await pool.query(
+      `INSERT INTO cooking_history (user_id, recipe_id, title)
+       VALUES ($1, $2, $3)`,
+      [userId, recipe.spoonacular_id, recipe.title]
+    );
+
     res.json({
       message: `${recipe.title} cooked successfully!`,
       updatedItems,
-      removedItems
+      removedItems,
     });
-
   } catch (err) {
     console.error('Cook recipe error:', err.message);
     res.status(500).json({ error: 'Failed to cook recipe' });

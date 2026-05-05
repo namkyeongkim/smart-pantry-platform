@@ -72,6 +72,29 @@ router.get('/recipes/top', async (req, res) => {
   }
 });
 
+// Get most cooked recipes based on actual cooking activity
+router.get('/recipes/cooked', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT
+        recipe_id,
+        title,
+        COUNT(*) AS cook_count,
+        MAX(cooked_at) AS last_cooked_at
+      FROM cooking_history
+      GROUP BY recipe_id, title
+      ORDER BY cook_count DESC, title ASC
+      LIMIT 10
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Cooked recipes error:', error);
+    res.status(500).json({ error: 'Failed to fetch cooked recipes' });
+  }
+});
+
+
 // Get all recipes sorted by popularity
 router.get('/recipes', async (req, res) => {
   try {
