@@ -8,6 +8,7 @@ function Pantry() {
     fetchPantry();
   }, []);
 
+  // Fetch aggregated pantry data from backend
   async function fetchPantry() {
     try {
       const res = await api.get('/admin/pantry');
@@ -17,18 +18,27 @@ function Pantry() {
     }
   }
 
+  // Show only top 15 items to avoid overwhelming UI
+  const topPantryItems = pantryItems.slice(0, 15);
+
   return (
     <div className="dashboard-page">
       <div className="page-heading">
-        <h1>Pantry</h1>
+        <h1>Pantry Insights</h1>
         <p>
-          View ingredient usage and compare private pantry items with shared
-          pantry items.
+          Review the most common ingredients and compare personal pantry usage
+          with shared pantry usage.
         </p>
       </div>
 
       <div className="section-card">
-        <h2>Pantry Overview</h2>
+        <h2>Top Pantry Ingredients</h2>
+
+        {/* Explanation for what this table represents */}
+        <p>
+          This table shows the highest-quantity pantry items across all users,
+          helping identify commonly used ingredients and usage patterns.
+        </p>
 
         <table className="dashboard-table">
           <thead>
@@ -36,27 +46,32 @@ function Pantry() {
               <th>Ingredient</th>
               <th>Total Quantity</th>
               <th>Unit</th>
-              <th>Users Holding Item</th>
+              <th>Users</th>
               <th>Pantry Type</th>
             </tr>
           </thead>
 
           <tbody>
-            {pantryItems.map((item, index) => (
+            {topPantryItems.map((item, index) => (
               <tr key={index}>
                 <td>{item.name}</td>
                 <td>{item.total_quantity}</td>
-                <td>{item.unit || 'N/A'}</td>
+
+                {/* Normalize unit display */}
+                <td>{item.unit ? item.unit.toLowerCase() : 'N/A'}</td>
+
                 <td>{item.user_count}</td>
+
+                {/* Convert backend "private" → UI "personal" */}
                 <td>
                   <span
                     className={
                       item.pantry_type === 'shared'
                         ? 'type-badge shared-badge'
-                        : 'type-badge private-badge'
+                        : 'type-badge personal-badge'
                     }
                   >
-                    {item.pantry_type || 'private'}
+                    {item.pantry_type === 'shared' ? 'shared' : 'personal'}
                   </span>
                 </td>
               </tr>

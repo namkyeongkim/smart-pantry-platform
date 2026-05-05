@@ -12,22 +12,22 @@ import {
 } from 'recharts';
 
 function Analytics() {
-  const [topRecipes, setTopRecipes] = useState([]);
+  const [cookedRecipes, setCookedRecipes] = useState([]);
   const [growthData, setGrowthData] = useState([]);
 
   useEffect(() => {
-    fetchTopRecipes();
+    fetchCookedRecipes();
     fetchGrowth();
   }, []);
 
-  async function fetchTopRecipes() {
+  async function fetchCookedRecipes() {
     try {
-      const res = await api.get('/admin/recipes/top');
-      setTopRecipes(res.data);
+      const res = await api.get('/admin/recipes/cooked');
+      setCookedRecipes(res.data);
     } catch (error) {
-      console.error('Analytics top recipes error:', error);
+      console.error('Analytics cooked recipes error:', error);
     }
-  };
+  }
 
   async function fetchGrowth() {
     try {
@@ -42,27 +42,30 @@ function Analytics() {
     } catch (error) {
       console.error('Growth error:', error);
     }
-  };
+  }
 
   return (
     <div className="dashboard-page">
       <div className="page-heading">
         <h1>Analytics</h1>
-        <p>View charts and engagement insights across the system.</p>
+        <p>View cooking activity and user growth insights across the system.</p>
       </div>
 
       <div className="section-grid">
         <div className="section-card">
-          <h2>Popular Recipes Chart</h2>
-          {topRecipes.length === 0 ? (
-            <p>No analytics data available.</p>
+          <h2>Most Cooked Recipes Chart</h2>
+          <p>Recipes ranked based on actual cooking activity.</p>
+
+          {cookedRecipes.length === 0 ? (
+            <p>No cooking data available.</p>
           ) : (
-            <TopRecipesChart data={topRecipes} />
+            <TopRecipesChart data={cookedRecipes} />
           )}
         </div>
 
         <div className="section-card">
           <h2>User Growth</h2>
+
           {growthData.length === 0 ? (
             <p>No user growth data available.</p>
           ) : (

@@ -14,12 +14,12 @@ function Dashboard() {
     totalFavorites: 0,
   });
 
-  const [topRecipes, setTopRecipes] = useState([]);
+  const [cookedRecipes, setCookedRecipes] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
 
   useEffect(() => {
     fetchStats();
-    fetchTopRecipes();
+    fetchCookedRecipes();
     fetchLowStock();
   }, []);
 
@@ -32,12 +32,12 @@ function Dashboard() {
     }
   }
 
-  async function fetchTopRecipes() {
+  async function fetchCookedRecipes() {
     try {
-      const res = await api.get('/admin/recipes/top');
-      setTopRecipes(res.data);
+      const res = await api.get('/admin/recipes/cooked');
+      setCookedRecipes(res.data);
     } catch (error) {
-      console.error('Top recipes error:', error);
+      console.error('Cooked recipes error:', error);
     }
   }
 
@@ -54,31 +54,33 @@ function Dashboard() {
     <div className="dashboard-page">
       <div className="page-heading">
         <h1>Dashboard Overview</h1>
-        <p>Track system usage, recipe engagement, and pantry status.</p>
+        <p>Track system usage, cooking activity, and pantry status.</p>
       </div>
 
       <div className="stats-grid">
         <StatCard title="Total Users" value={stats.totalUsers} />
         <StatCard title="Total Recipes" value={stats.totalRecipes} />
         <StatCard title="Total Pantry Items" value={stats.totalPantryItems} />
-        <StatCard title="Private Pantry Items" value={stats.totalPrivatePantryItems} />
-        <StatCard title="Shared Pantry Items" value={stats.totalSharedPantryItems} />
         <StatCard title="Shared Pantries" value={stats.totalSharedPantries} />
         <StatCard title="Total Favorites" value={stats.totalFavorites} />
       </div>
 
       <div className="section-grid">
         <div className="section-card">
-          <h2>Popular Recipes</h2>
-          {topRecipes.length === 0 ? (
-            <p>No recipe data available.</p>
+          <h2>Most Cooked Recipes</h2>
+          <p>Recipes ranked based on actual cooking activity.</p>
+
+          {cookedRecipes.length === 0 ? (
+            <p>No cooking data available.</p>
           ) : (
-            <TopRecipesChart data={topRecipes} />
+            <TopRecipesChart data={cookedRecipes} />
           )}
         </div>
 
         <div className="section-card">
           <h2>Low Stock Items</h2>
+          <p>Items that are running low across personal and shared pantries.</p>
+
           {lowStockItems.length === 0 ? (
             <p>No low stock items.</p>
           ) : (
@@ -90,6 +92,7 @@ function Dashboard() {
                   <th>Type</th>
                 </tr>
               </thead>
+
               <tbody>
                 {lowStockItems.map((item, index) => (
                   <tr key={index}>
@@ -97,7 +100,9 @@ function Dashboard() {
                     <td className="low-stock-warning">
                       {item.quantity} {item.unit}
                     </td>
-                    <td>{item.pantry_type}</td>
+                    <td>
+                      {item.pantry_type === 'shared' ? 'shared' : 'personal'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

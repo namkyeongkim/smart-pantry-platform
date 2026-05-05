@@ -14,7 +14,11 @@ function TopRecipesChart({ data }) {
       item.title.length > 15
         ? item.title.slice(0, 15) + '...'
         : item.title,
-    count: parseInt(item.favorite_count),
+
+    // support BOTH favorite + cooked
+    count: parseInt(
+      item.favorite_count || item.cook_count || item.value || 0
+    ),
   }));
 
   return (
