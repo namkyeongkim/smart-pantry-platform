@@ -40,16 +40,39 @@ const HomeScreen = ({ navigation }) => {
     loadShoppingListCount();
   }, []);
 
+  const getCurrentUserId = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (!userData) return null;
+
+      const user = JSON.parse(userData);
+      return user.id;
+    } catch (error) {
+      console.log('Failed to get current user', error);
+      return null;
+    }
+  };
+
   const loadCookingHistory = async () => {
     try {
-      const history = await AsyncStorage.getItem('cooking_history');
+      const userId = await getCurrentUserId();
+
+      if (!userId) {
+        setRecentlyCooked([]);
+        return;
+      }
+
+      const history = await AsyncStorage.getItem(`cooking_history_${userId}`);
 
       if (history) {
         const parsed = JSON.parse(history);
         setRecentlyCooked(parsed.slice(0, 3));
+      } else {
+        setRecentlyCooked([]);
       }
     } catch (error) {
       console.log('Failed to load cooking history', error);
+      setRecentlyCooked([]);
     }
   };
 

@@ -27,10 +27,31 @@ const CookRecipeScreen = ({ route, navigation }) => {
   const recipeId = recipe.id || recipe.recipe_id;
   const hasAllIngredients = recipe.hasAllIngredients ?? false;
 
+  const getCurrentUserId = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (!userData) return null;
+
+      const user = JSON.parse(userData);
+      return user.id;
+    } catch (error) {
+      console.log('Failed to get current user', error);
+      return null;
+    }
+  };
   // Save cooked recipe to local cooking history
   const saveCookHistory = async (recipe) => {
     try {
-      const history = await AsyncStorage.getItem('cooking_history');
+      const userId = await getCurrentUserId();
+
+      if (!userId) {
+        console.log('No user found');
+        return;
+      }
+
+      const storageKey = `cooking_history_${userId}`;
+
+      const history = await AsyncStorage.getItem(storageKey);
       let historyList = history ? JSON.parse(history) : [];
 
       const newItem = {
@@ -41,19 +62,16 @@ const CookRecipeScreen = ({ route, navigation }) => {
         date: new Date().toISOString(),
       };
 
-      // Remove duplicates
       historyList = historyList.filter(
         (item) => item.recipe_id !== newItem.recipe_id
       );
 
-      // Add newest item to the top
       historyList.unshift(newItem);
 
-      // Keep only latest 20 items
       historyList = historyList.slice(0, 20);
 
       await AsyncStorage.setItem(
-        'cooking_history',
+        storageKey,
         JSON.stringify(historyList)
       );
     } catch (error) {

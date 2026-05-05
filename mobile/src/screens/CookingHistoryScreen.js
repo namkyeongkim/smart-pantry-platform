@@ -12,77 +12,92 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CookingHistoryScreen = ({ navigation }) => {
-
   const [history, setHistory] = useState([]);
+
+  const getCurrentUserId = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (!userData) return null;
+
+      const user = JSON.parse(userData);
+      return user.id;
+    } catch (error) {
+      console.log('Failed to get current user', error);
+      return null;
+    }
+  };
+
+  const getCookingHistoryKey = async () => {
+    const userId = await getCurrentUserId();
+    return userId ? `cooking_history_${userId}` : null;
+  };
 
   useEffect(() => {
     loadHistory();
 
-    // reload history when returning to screen
     const unsubscribe = navigation.addListener('focus', loadHistory);
-
     return unsubscribe;
-  }, []);
+  }, [navigation]);
 
   const loadHistory = async () => {
-
     try {
+      const storageKey = await getCookingHistoryKey();
 
-      const data = await AsyncStorage.getItem("cooking_history");
+      if (!storageKey) {
+        setHistory([]);
+        return;
+      }
+
+      const data = await AsyncStorage.getItem(storageKey);
 
       if (data) {
         setHistory(JSON.parse(data));
       } else {
         setHistory([]);
       }
-
     } catch (error) {
-
-      console.log("History load error", error);
-
+      console.log('History load error', error);
+      setHistory([]);
     }
-
   };
 
   const clearHistory = () => {
-
     Alert.alert(
-      "Clear History",
-      "Remove all cooking history?",
+      'Clear History',
+      'Remove all cooking history?',
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Clear",
+          text: 'Clear',
           onPress: async () => {
+            const storageKey = await getCookingHistoryKey();
 
-            await AsyncStorage.removeItem("cooking_history");
+            if (storageKey) {
+              await AsyncStorage.removeItem(storageKey);
+            }
+
             setHistory([]);
-
           }
         }
       ]
     );
-
   };
 
   const renderItem = ({ item }) => (
-
     <TouchableOpacity
       style={styles.card}
       onPress={() =>
-        navigation.navigate("RecipeDetail", {
+        navigation.navigate('RecipeDetail', {
           recipe: item
         })
       }
     >
-
       <Image
         source={{ uri: item.image }}
         style={styles.image}
       />
 
       <View style={styles.info}>
-
         <Text style={styles.title}>
           {item.title}
         </Text>
@@ -90,63 +105,44 @@ const CookingHistoryScreen = ({ navigation }) => {
         <Text style={styles.date}>
           {new Date(item.date).toLocaleDateString()}
         </Text>
-
       </View>
-
     </TouchableOpacity>
-
   );
 
   return (
-
     <View style={styles.container}>
-
       <View style={styles.headerRow}>
-
         <Text style={styles.header}>
           🍳 Recently Cooked
         </Text>
 
         {history.length > 0 && (
-
           <TouchableOpacity onPress={clearHistory}>
             <Text style={styles.clearText}>
               Clear
             </Text>
           </TouchableOpacity>
-
         )}
-
       </View>
 
       {history.length === 0 ? (
-
         <View style={styles.emptyContainer}>
-
           <Text style={styles.emptyText}>
             No cooking history yet.
           </Text>
-
         </View>
-
       ) : (
-
         <FlatList
           data={history}
           keyExtractor={(item, index) => index.toString()}
           renderItem={renderItem}
         />
-
       )}
-
     </View>
-
   );
-
 };
 
 const styles = StyleSheet.create({
-
   container:{
     flex:1,
     padding:15,
@@ -212,7 +208,6 @@ const styles = StyleSheet.create({
     color:"#888",
     fontSize:16
   }
-
 });
 
 export default CookingHistoryScreen;
